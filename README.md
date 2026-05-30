@@ -6,6 +6,8 @@ Echometer runs a comprehensive connection test in your browser — no app, no se
 
 **Live:** https://rajeshsub.github.io/echometer/
 
+![Echometer screenshot](src/assets/screenshot.png)
+
 ---
 
 ## What it measures
