@@ -8,7 +8,7 @@ const { mockRunTest, mockMeasureBufferBloat } = vi.hoisted(() => ({
 vi.mock('../../config', () => ({
   config: {
     locateApiUrl: 'https://locate.measurementlab.net/v2/nearest/ndt/ndt7',
-    clientName: 'echometer',
+    clientName: 'netprobe',
     clientVersion: '1.0.0',
     workerBase: '/',
     regions: [

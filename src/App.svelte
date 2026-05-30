@@ -24,10 +24,10 @@
     const { workerBase } = config
     fetch(`${workerBase}ndt7-download-worker.js`, { method: 'HEAD' })
       .then(r => {
-        if (!r.ok) console.error(`[echometer] worker file not found: ${workerBase}ndt7-download-worker.js (${r.status})`)
-        else console.log(`[echometer] worker files OK at ${workerBase}`)
+        if (!r.ok) console.error(`[netprobe] worker file not found: ${workerBase}ndt7-download-worker.js (${r.status})`)
+        else console.log(`[netprobe] worker files OK at ${workerBase}`)
       })
-      .catch(e => console.error('[echometer] worker file fetch failed:', e))
+      .catch(e => console.error('[netprobe] worker file fetch failed:', e))
   })
 
   const phaseLabel: Record<string, string> = {
@@ -88,7 +88,7 @@
   <header>
     <div class="container">
       <div class="brand">
-        <h1 class="wordmark">Echometer</h1>
+        <h1 class="wordmark">Netprobe</h1>
         <span class="tagline">Network quality, measured honestly.</span>
       </div>
     </div>

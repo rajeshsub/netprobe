@@ -1,9 +1,9 @@
 const env = import.meta.env
 
 if (env.DEV) {
-  console.log('[echometer] config — BASE_URL:', env.BASE_URL)
-  console.log('[echometer] config — locate API:', env.VITE_LOCATE_API_URL)
-  console.log('[echometer] config — workerBase:', env.BASE_URL)
+  console.log('[netprobe] config — BASE_URL:', env.BASE_URL)
+  console.log('[netprobe] config — locate API:', env.VITE_LOCATE_API_URL)
+  console.log('[netprobe] config — workerBase:', env.BASE_URL)
 }
 
 export const config = {

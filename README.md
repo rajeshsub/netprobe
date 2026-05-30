@@ -1,12 +1,12 @@
-# Echometer
+# Netprobe
 
 Network quality, measured honestly.
 
-Echometer runs a comprehensive connection test in your browser — no app, no server, no account. It measures what actually matters for a real internet connection: not just raw speed, but latency, jitter, and buffer bloat.
+Netprobe runs a comprehensive connection test in your browser — no app, no server, no account. It measures what actually matters for a real internet connection: not just raw speed, but latency, jitter, and buffer bloat.
 
-**Live:** https://rajeshsub.github.io/echometer/
+**Live:** https://rajeshsub.github.io/netprobe/
 
-![Echometer screenshot](src/assets/screenshot.png)
+![Netprobe screenshot](src/assets/screenshot.png)
 
 ---
 
@@ -59,12 +59,11 @@ Copy `.env.example` to `.env` before running locally. All configuration is via e
 
 Pushes to `main` automatically build and deploy to GitHub Pages via GitHub Actions.
 
-Before the first deploy, two steps are needed in the repository settings:
+Before the first deploy, one step is needed in the repository settings:
 
 1. **Settings → Pages → Source:** set to `GitHub Actions`
-2. **Settings → Variables → Actions:** add `VITE_BASE_URL` = `/echometer/`
 
-All other config values have working defaults and only need to be set if you want to override them (e.g. to point at different M-Lab servers).
+All config values have working defaults and no GitHub Variables need to be set.
 
 ---
 
