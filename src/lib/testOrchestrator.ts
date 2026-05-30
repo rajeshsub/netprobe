@@ -59,13 +59,16 @@ export async function runFullTest(callbacks: OrchestratorCallbacks): Promise<Tes
     getGlobalRegions().map(region =>
       runTest(region.hostname, {
         onError: () => {},
-      }).then(result => ({
-        name: region.name,
-        downloadMbps: result.downloadMbps,
-        uploadMbps: result.uploadMbps,
-        latencyMs: result.latencyMs,
-        error: null,
-      } satisfies RegionResult)).catch((): RegionResult => ({
+      }).then(result => {
+        if (result.downloadMbps === 0 && result.uploadMbps === 0) throw new Error('no data')
+        return {
+          name: region.name,
+          downloadMbps: result.downloadMbps,
+          uploadMbps: result.uploadMbps,
+          latencyMs: result.latencyMs,
+          error: null,
+        } satisfies RegionResult
+      }).catch((): RegionResult => ({
         name: region.name,
         downloadMbps: null,
         uploadMbps: null,
