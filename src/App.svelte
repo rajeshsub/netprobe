@@ -90,7 +90,7 @@
     {#if testState.phase === 'idle'}
       <div class="hero-idle">
         <p class="hero-desc">
-          Measures latency, jitter, download &amp; upload speed across 6 global regions, plus buffer bloat — the hidden connection killer.
+          Measures latency, jitter, download &amp; upload speed across 6 global regions, plus the often ignored buffer bloat, which could rather make or break a connection.
         </p>
         <button class="start-btn" onclick={startTest}>Start Test</button>
       </div>
