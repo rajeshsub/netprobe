@@ -1,6 +1,6 @@
 # Netprobe
 
-Network quality, measured honestly.
+Network quality, measured in the way it matters.
 
 Netprobe runs a comprehensive connection test in your browser — no app, no server, no account. It measures what actually matters for a real internet connection: not just raw speed, but latency, jitter, and buffer bloat.
 

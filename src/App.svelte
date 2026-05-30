@@ -89,7 +89,7 @@
     <div class="container">
       <div class="brand">
         <h1 class="wordmark">Netprobe</h1>
-        <span class="tagline">Network quality, measured honestly.</span>
+        <span class="tagline">Network quality, in the way it matters.</span>
       </div>
     </div>
   </header>
