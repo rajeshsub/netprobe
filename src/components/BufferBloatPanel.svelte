@@ -44,15 +44,20 @@
 
   let showInfo = $state(false)
   const hasData = $derived(samples.length > 0)
+  const measured = $derived(done && samples.length > 0)
+  const unmeasurable = $derived(done && samples.length === 0)
 </script>
 
 <div class="panel" class:active>
   <div class="top">
     <div class="grade-col">
       <span class="section-label">Buffer Bloat</span>
-      {#if done}
+      {#if measured}
         <span class="grade" style="color: {gradeColor[grade]}">{grade}</span>
         <span class="delta">+{Math.round(delta)}ms under load</span>
+      {:else if unmeasurable}
+        <span class="grade evaluating">?</span>
+        <span class="delta">Unable to measure</span>
       {:else}
         <span class="grade evaluating">—</span>
         <span class="delta">Evaluating...</span>
@@ -85,7 +90,7 @@
     </div>
   </div>
 
-  {#if done && showInfo}
+  {#if measured && showInfo}
     <div class="info-box">
       <p class="info-current">{gradeDesc[grade]}</p>
       <table class="grade-table">

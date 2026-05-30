@@ -58,7 +58,8 @@ export async function runFullTest(callbacks: OrchestratorCallbacks): Promise<Tes
 
   callbacks.onPhase('global')
 
-  // Run all region tests in parallel, streaming each result as it arrives
+  const completedRegions: RegionResult[] = []
+
   await Promise.allSettled(
     getGlobalRegions().map(region =>
       runTest(region.hostname, { onError: () => {} })
@@ -71,6 +72,7 @@ export async function runFullTest(callbacks: OrchestratorCallbacks): Promise<Tes
             latencyMs: result.latencyMs,
             error: null,
           }
+          completedRegions.push(r)
           callbacks.onRegionComplete(r)
           return r
         })
@@ -82,6 +84,7 @@ export async function runFullTest(callbacks: OrchestratorCallbacks): Promise<Tes
             latencyMs: null,
             error: 'unavailable',
           }
+          completedRegions.push(r)
           callbacks.onRegionComplete(r)
           return r
         })
@@ -96,7 +99,7 @@ export async function runFullTest(callbacks: OrchestratorCallbacks): Promise<Tes
     bufferBloatDelta: bufferBloat.delta,
     bufferBloatGrade: bufferBloat.grade,
     nearestRegion: nearestResult.serverHostname,
-    regions: [],  // built incrementally via onRegionComplete
+    regions: completedRegions,
     timestamp: Date.now(),
   }
 

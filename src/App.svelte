@@ -37,6 +37,7 @@
   )
 
   const isDone = $derived(testState.phase === 'done')
+  const testProducedData = $derived(testState.downloadMbps > 0 || testState.uploadMbps > 0)
 
   async function startTest() {
     testState.reset()
@@ -101,10 +102,13 @@
       </div>
     {:else}
       {#if isRunning || isDone}
-        <div class="status-panel" class:done={isDone}>
-          {#if isDone}
+        <div class="status-panel" class:done={isDone && testProducedData} class:warn={isDone && !testProducedData}>
+          {#if isDone && testProducedData}
             <span class="done-dot" aria-hidden="true">✓</span>
             <span>All steps complete</span>
+          {:else if isDone && !testProducedData}
+            <span class="warn-dot" aria-hidden="true">!</span>
+            <span>Test completed but no data was returned — M-Lab servers may be temporarily unreachable</span>
           {:else}
             <span class="pulse-dot" aria-hidden="true"></span>
             <span>{phaseLabel[testState.phase] ?? ''}</span>
@@ -285,9 +289,21 @@
     color: var(--grade-a);
   }
 
+  .status-panel.warn {
+    border-color: var(--grade-c);
+    color: var(--grade-c);
+  }
+
   .done-dot {
     font-size: 0.85rem;
     font-weight: 700;
+    flex-shrink: 0;
+  }
+
+  .warn-dot {
+    font-size: 0.85rem;
+    font-weight: 800;
+    flex-shrink: 0;
   }
 
   .pulse-dot {
