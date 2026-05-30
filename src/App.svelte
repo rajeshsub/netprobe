@@ -151,7 +151,7 @@
         />
       {/if}
 
-      {#if testState.regions.length > 0 || testState.phase === 'global'}
+      {#if testState.phase === 'global' || testState.phase === 'done' || testState.regions.length > 0}
         <RegionTable
           regions={testState.regions}
           loading={testState.phase === 'global'}

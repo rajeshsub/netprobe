@@ -18,6 +18,7 @@ export interface NDT7Callbacks {
   onServerChosen?: (hostname: string) => void
   onDownloadStart?: () => void
   onDownloadSample?: (sample: SpeedSample) => void
+  onLatencySample?: (ms: number) => void
   onDownloadComplete?: () => void
   onUploadSample?: (sample: SpeedSample) => void
   onError?: (msg: string) => void
@@ -25,11 +26,7 @@ export interface NDT7Callbacks {
 
 function extractHostname(urls: Record<string, string>): string {
   const downloadUrl = urls['wss:///ndt/v7/download'] || ''
-  try {
-    return new URL(downloadUrl).hostname
-  } catch {
-    return ''
-  }
+  try { return new URL(downloadUrl).hostname } catch { return '' }
 }
 
 function mbpsFromClientData(data: { MeanClientMbps?: number }): number {
@@ -39,19 +36,19 @@ function mbpsFromClientData(data: { MeanClientMbps?: number }): number {
 function latencyFromServerMeasurement(m: { TCPInfo?: { MinRTT?: number; RTTVar?: number } }) {
   const rtt = m?.TCPInfo?.MinRTT ?? 0
   const rttVar = m?.TCPInfo?.RTTVar ?? 0
-  return {
-    latencyMs: rtt / 1000,
-    jitterMs: rttVar / 1000,
-  }
+  return { latencyMs: rtt / 1000, jitterMs: rttVar / 1000 }
+}
+
+function rttFromServerMeasurement(m: Record<string, unknown>): number {
+  const tcpInfo = m.TCPInfo as { RTT?: number; SmoothedRTT?: number } | undefined
+  const rtt = tcpInfo?.RTT ?? tcpInfo?.SmoothedRTT ?? 0
+  return rtt / 1000  // μs → ms
 }
 
 export async function runTest(
   serverHostname: string | null,
   callbacks: NDT7Callbacks
 ): Promise<NDT7Result> {
-  // Always go through the locate API so we get a valid access token.
-  // For a specific region server, pass it as the `machine` metadata param —
-  // the locate API uses this to return URLs for that exact machine.
   const baseConfig = {
     userAcceptedDataPolicy: true,
     loadbalancer: config.locateApiUrl,
@@ -82,10 +79,17 @@ export async function runTest(
     downloadStart: () => callbacks.onDownloadStart?.(),
     downloadMeasurement: ({ Source, Data }: { Source: string; Data: Record<string, unknown> }) => {
       if (Source === 'client') {
-        const sample = { elapsedSeconds: (Data.ElapsedTime as number) ?? 0, mbps: mbpsFromClientData(Data as { MeanClientMbps?: number }) }
+        const sample = {
+          elapsedSeconds: (Data.ElapsedTime as number) ?? 0,
+          mbps: mbpsFromClientData(Data as { MeanClientMbps?: number }),
+        }
         downloadMbps = sample.mbps
         callbacks.onDownloadSample?.(sample)
       } else {
+        // Emit current smoothed RTT for the live sparkline
+        const rtt = rttFromServerMeasurement(Data)
+        if (rtt > 0) callbacks.onLatencySample?.(rtt)
+
         const { latencyMs: l, jitterMs: j } = latencyFromServerMeasurement(Data as { TCPInfo?: { MinRTT?: number; RTTVar?: number } })
         if (l > 0) { latencyMs = l; jitterMs = j }
       }
@@ -103,7 +107,10 @@ export async function runTest(
   await uploadTest(baseConfig, {
     uploadMeasurement: ({ Source, Data }: { Source: string; Data: Record<string, unknown> }) => {
       if (Source === 'client') {
-        const sample = { elapsedSeconds: (Data.ElapsedTime as number) ?? 0, mbps: mbpsFromClientData(Data as { MeanClientMbps?: number }) }
+        const sample = {
+          elapsedSeconds: (Data.ElapsedTime as number) ?? 0,
+          mbps: mbpsFromClientData(Data as { MeanClientMbps?: number }),
+        }
         uploadMbps = sample.mbps
         callbacks.onUploadSample?.(sample)
       }

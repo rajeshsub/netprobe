@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-const { mockRunTest, mockMeasureBufferBloat } = vi.hoisted(() => ({
+const { mockRunTest, mockComputeBufferBloat } = vi.hoisted(() => ({
   mockRunTest: vi.fn(),
-  mockMeasureBufferBloat: vi.fn(),
+  mockComputeBufferBloat: vi.fn(),
 }))
 
 vi.mock('../../config', () => ({
@@ -23,12 +23,11 @@ vi.mock('../../config', () => ({
 
 vi.mock('../ndt7Engine', () => ({ runTest: mockRunTest }))
 vi.mock('../bufferBloatDetector', () => ({
-  measureBufferBloat: mockMeasureBufferBloat,
-  computeBufferBloat: vi.fn(),
+  computeBufferBloat: mockComputeBufferBloat,
   gradeFromDelta: vi.fn(),
 }))
 vi.mock('../regionSelector', () => ({
-  buildPingUrl: (h: string) => `https://${h}/ndt/v7/download`,
+  buildPingUrl: (h: string) => `https://${h}/favicon.ico`,
   getGlobalRegions: () => [
     { name: 'US East',   hostname: 'mlab1-lga05.mlab-oti.measurement-lab.org' },
     { name: 'US West',   hostname: 'mlab1-lax05.mlab-oti.measurement-lab.org' },
@@ -41,33 +40,22 @@ vi.mock('../regionSelector', () => ({
 
 import { runFullTest } from '../testOrchestrator'
 
+const bloatResult = { baseline: 12, underLoad: 40, delta: 28, grade: 'B' as const, samples: [] }
+
 const nearestResult = {
-  downloadMbps: 450,
-  uploadMbps: 120,
-  latencyMs: 12,
-  jitterMs: 3,
+  downloadMbps: 450, uploadMbps: 120, latencyMs: 12, jitterMs: 3,
   serverHostname: 'mlab1-lga05.mlab-oti.measurement-lab.org',
 }
 
 const regionResult = {
-  downloadMbps: 300,
-  uploadMbps: 100,
-  latencyMs: 20,
-  jitterMs: 5,
+  downloadMbps: 300, uploadMbps: 100, latencyMs: 20, jitterMs: 5,
   serverHostname: 'mlab1-lax05.mlab-oti.measurement-lab.org',
-}
-
-const bloatResult = {
-  baseline: 12,
-  underLoad: 40,
-  delta: 28,
-  grade: 'B' as const,
-  samples: [12, 40, 38, 42],
 }
 
 type RunTestCbs = {
   onServerChosen?: (h: string) => void
   onDownloadComplete?: () => void
+  onLatencySample?: (ms: number) => void
   onError?: (m: string) => void
 }
 
@@ -85,7 +73,7 @@ function makeCallbacks() {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  mockMeasureBufferBloat.mockResolvedValue(bloatResult)
+  mockComputeBufferBloat.mockReturnValue(bloatResult)
 })
 
 describe('runFullTest', () => {
@@ -95,7 +83,6 @@ describe('runFullTest', () => {
       .mockImplementationOnce(async (_: null, cbs: RunTestCbs) => {
         order.push('nearest')
         cbs.onServerChosen?.('mlab1-lga05.mlab-oti.measurement-lab.org')
-        await new Promise<void>(r => setTimeout(r, 10))
         cbs.onDownloadComplete?.()
         return nearestResult
       })
@@ -129,22 +116,29 @@ describe('runFullTest', () => {
       .mockRejectedValueOnce(new Error('region 1 failed'))
       .mockResolvedValue(regionResult)
 
-    const results = await runFullTest(makeCallbacks())
-    expect(results.regions.some(r => r.error === 'failed')).toBe(true)
-    expect(results.regions.some(r => r.error === null)).toBe(true)
+    const callbacks = makeCallbacks()
+    await runFullTest(callbacks)
+
+    const completedRegions = callbacks.onRegionComplete.mock.calls.map((c: unknown[]) => c[0] as { error: string | null })
+    expect(completedRegions.some(r => r.error !== null)).toBe(true)
+    expect(completedRegions.some(r => r.error === null)).toBe(true)
   })
 
-  it('excludes failed regions from the averaged headline', async () => {
+  it('streams region results as each completes via onRegionComplete', async () => {
+    const completionOrder: string[] = []
     mockRunTest
       .mockImplementationOnce(async (_: null, cbs: RunTestCbs) => {
         cbs.onServerChosen?.('nearest-host')
         cbs.onDownloadComplete?.()
         return nearestResult
       })
-      .mockRejectedValue(new Error('all regions failed'))
+      .mockResolvedValue(regionResult)
 
-    const results = await runFullTest(makeCallbacks())
-    expect(results.downloadMbps).toBe(nearestResult.downloadMbps)
+    const callbacks = makeCallbacks()
+    callbacks.onRegionComplete = vi.fn((r: { name: string }) => completionOrder.push(r.name))
+
+    await runFullTest(callbacks)
+    expect(callbacks.onRegionComplete).toHaveBeenCalledTimes(5)
   })
 
   it('transitions through expected phases in order', async () => {
