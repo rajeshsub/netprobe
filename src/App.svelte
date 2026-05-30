@@ -19,6 +19,15 @@
         isShared = true
       }
     }
+
+    // Verify worker files are reachable — silent 404 is the most common cause of 0-data tests
+    const { workerBase } = config
+    fetch(`${workerBase}ndt7-download-worker.js`, { method: 'HEAD' })
+      .then(r => {
+        if (!r.ok) console.error(`[echometer] worker file not found: ${workerBase}ndt7-download-worker.js (${r.status})`)
+        else console.log(`[echometer] worker files OK at ${workerBase}`)
+      })
+      .catch(e => console.error('[echometer] worker file fetch failed:', e))
   })
 
   const phaseLabel: Record<string, string> = {
@@ -108,7 +117,10 @@
             <span>All steps complete</span>
           {:else if isDone && !testProducedData}
             <span class="warn-dot" aria-hidden="true">!</span>
-            <span>Test completed but no data was returned — M-Lab servers may be temporarily unreachable</span>
+            <span>
+              No data returned. Check the browser console (F12 → Console) for the error.
+              {#if testState.error} <em>{testState.error}</em>{/if}
+            </span>
           {:else}
             <span class="pulse-dot" aria-hidden="true"></span>
             <span>{phaseLabel[testState.phase] ?? ''}</span>

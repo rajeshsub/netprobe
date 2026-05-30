@@ -1,5 +1,11 @@
 const env = import.meta.env
 
+if (env.DEV) {
+  console.log('[echometer] config — BASE_URL:', env.BASE_URL)
+  console.log('[echometer] config — locate API:', env.VITE_LOCATE_API_URL)
+  console.log('[echometer] config — workerBase:', env.BASE_URL)
+}
+
 export const config = {
   locateApiUrl: env.VITE_LOCATE_API_URL as string,
   clientName: env.VITE_CLIENT_NAME as string,

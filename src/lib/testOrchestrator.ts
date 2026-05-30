@@ -1,6 +1,6 @@
 import { runTest } from './ndt7Engine'
-import { computeBufferBloat } from './bufferBloatDetector'
-import { getGlobalRegions } from './regionSelector'
+import { measureBufferBloat } from './bufferBloatDetector'
+import { buildPingUrl, getGlobalRegions } from './regionSelector'
 import type { BufferBloatResult } from './bufferBloatDetector'
 import type { RegionResult, TestResults } from './urlSerializer'
 import type { SpeedSample } from './ndt7Engine'
@@ -24,32 +24,29 @@ export interface OrchestratorCallbacks {
   onError(msg: string): void
 }
 
-const BASELINE_COUNT = 4  // first N server RTT readings treated as baseline
-
 export async function runFullTest(callbacks: OrchestratorCallbacks): Promise<TestResults> {
   callbacks.onPhase('locating')
 
-  const rttSamples: number[] = []
   let bufferBloat: BufferBloatResult = { baseline: 0, underLoad: 0, delta: 0, grade: 'A', samples: [] }
+  let pingUrl = ''
+  let downloadResolve: (() => void) | null = null
+  const downloadDone = new Promise<void>(resolve => { downloadResolve = resolve })
 
   const nearestResult = await runTest(null, {
     onServerChosen: (hostname) => {
+      pingUrl = buildPingUrl(hostname)
       callbacks.onNearestServer(hostname)
       callbacks.onPhase('nearest_download')
+
+      void measureBufferBloat(
+        pingUrl,
+        () => downloadDone,
+        (ms) => callbacks.onLatencySample(ms)
+      ).then(result => { bufferBloat = result })
     },
     onDownloadSample: (s) => callbacks.onDownloadSample(s),
-    onLatencySample: (ms) => {
-      rttSamples.push(ms)
-      callbacks.onLatencySample(ms)
-    },
     onDownloadComplete: () => {
-      // Compute buffer bloat now — all RTT samples are in
-      const baseline = rttSamples.slice(0, BASELINE_COUNT)
-      const underLoad = rttSamples.slice(BASELINE_COUNT)
-      bufferBloat = computeBufferBloat(
-        baseline.length ? baseline : rttSamples,
-        underLoad.length ? underLoad : rttSamples
-      )
+      downloadResolve?.()
       callbacks.onPhase('nearest_upload')
     },
     onUploadSample: (s) => callbacks.onUploadSample(s),
@@ -74,7 +71,6 @@ export async function runFullTest(callbacks: OrchestratorCallbacks): Promise<Tes
           }
           completedRegions.push(r)
           callbacks.onRegionComplete(r)
-          return r
         })
         .catch(() => {
           const r: RegionResult = {
@@ -86,7 +82,6 @@ export async function runFullTest(callbacks: OrchestratorCallbacks): Promise<Tes
           }
           completedRegions.push(r)
           callbacks.onRegionComplete(r)
-          return r
         })
     )
   )

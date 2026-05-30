@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-const { mockRunTest, mockComputeBufferBloat } = vi.hoisted(() => ({
+const { mockRunTest, mockMeasureBufferBloat } = vi.hoisted(() => ({
   mockRunTest: vi.fn(),
-  mockComputeBufferBloat: vi.fn(),
+  mockMeasureBufferBloat: vi.fn(),
 }))
 
 vi.mock('../../config', () => ({
@@ -23,7 +23,8 @@ vi.mock('../../config', () => ({
 
 vi.mock('../ndt7Engine', () => ({ runTest: mockRunTest }))
 vi.mock('../bufferBloatDetector', () => ({
-  computeBufferBloat: mockComputeBufferBloat,
+  measureBufferBloat: mockMeasureBufferBloat,
+  computeBufferBloat: vi.fn(),
   gradeFromDelta: vi.fn(),
 }))
 vi.mock('../regionSelector', () => ({
@@ -40,7 +41,7 @@ vi.mock('../regionSelector', () => ({
 
 import { runFullTest } from '../testOrchestrator'
 
-const bloatResult = { baseline: 12, underLoad: 40, delta: 28, grade: 'B' as const, samples: [] }
+const bloatResult = { baseline: 12, underLoad: 40, delta: 28, grade: 'B' as const, samples: [12, 40, 38] }
 
 const nearestResult = {
   downloadMbps: 450, uploadMbps: 120, latencyMs: 12, jitterMs: 3,
@@ -55,7 +56,6 @@ const regionResult = {
 type RunTestCbs = {
   onServerChosen?: (h: string) => void
   onDownloadComplete?: () => void
-  onLatencySample?: (ms: number) => void
   onError?: (m: string) => void
 }
 
@@ -73,7 +73,7 @@ function makeCallbacks() {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  mockComputeBufferBloat.mockReturnValue(bloatResult)
+  mockMeasureBufferBloat.mockResolvedValue(bloatResult)
 })
 
 describe('runFullTest', () => {
@@ -83,6 +83,7 @@ describe('runFullTest', () => {
       .mockImplementationOnce(async (_: null, cbs: RunTestCbs) => {
         order.push('nearest')
         cbs.onServerChosen?.('mlab1-lga05.mlab-oti.measurement-lab.org')
+        await new Promise<void>(r => setTimeout(r, 10))
         cbs.onDownloadComplete?.()
         return nearestResult
       })
@@ -119,13 +120,12 @@ describe('runFullTest', () => {
     const callbacks = makeCallbacks()
     await runFullTest(callbacks)
 
-    const completedRegions = callbacks.onRegionComplete.mock.calls.map((c: unknown[]) => c[0] as { error: string | null })
-    expect(completedRegions.some(r => r.error !== null)).toBe(true)
-    expect(completedRegions.some(r => r.error === null)).toBe(true)
+    const regions = callbacks.onRegionComplete.mock.calls.map((c: unknown[]) => c[0] as { error: string | null })
+    expect(regions.some(r => r.error !== null)).toBe(true)
+    expect(regions.some(r => r.error === null)).toBe(true)
   })
 
-  it('streams region results as each completes via onRegionComplete', async () => {
-    const completionOrder: string[] = []
+  it('streams each region result immediately via onRegionComplete', async () => {
     mockRunTest
       .mockImplementationOnce(async (_: null, cbs: RunTestCbs) => {
         cbs.onServerChosen?.('nearest-host')
@@ -135,8 +135,6 @@ describe('runFullTest', () => {
       .mockResolvedValue(regionResult)
 
     const callbacks = makeCallbacks()
-    callbacks.onRegionComplete = vi.fn((r: { name: string }) => completionOrder.push(r.name))
-
     await runFullTest(callbacks)
     expect(callbacks.onRegionComplete).toHaveBeenCalledTimes(5)
   })
