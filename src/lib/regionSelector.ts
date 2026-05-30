@@ -10,7 +10,7 @@ export function getGlobalRegions(): RegionServer[] {
 }
 
 export function buildPingUrl(hostname: string): string {
-  return `https://${hostname}/ndt/v7/download`
+  return `https://${hostname}/`
 }
 
 export async function selectServers() {

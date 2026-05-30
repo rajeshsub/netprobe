@@ -29,7 +29,7 @@ export function computeBufferBloat(
 
 async function ping(url: string): Promise<number> {
   const t = performance.now()
-  await fetch(url, { method: 'HEAD', cache: 'no-store', mode: 'cors' })
+  await fetch(url, { cache: 'no-store', mode: 'no-cors' })
   return performance.now() - t
 }
 

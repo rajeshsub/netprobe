@@ -21,18 +21,25 @@
     D: '#f97316',
     F: '#ef4444',
   }
+
+  const hasData = $derived(samples.length > 0)
 </script>
 
 <div class="panel" class:active>
   <div class="header">
     <span class="section-label">Buffer Bloat</span>
-    <span class="grade" style="color: {gradeColor[grade]}">{grade}</span>
-    <span class="delta">+{Math.round(delta)}ms under load</span>
+    {#if hasData}
+      <span class="grade" style="color: {gradeColor[grade]}">{grade}</span>
+      <span class="delta">+{Math.round(delta)}ms under load</span>
+    {:else}
+      <span class="grade evaluating">—</span>
+      <span class="delta">Evaluating...</span>
+    {/if}
   </div>
-  {#if samples.length > 0}
+  {#if hasData}
     <LatencySparkline {samples} />
   {:else}
-    <div class="placeholder">Latency graph appears during download test</div>
+    <div class="placeholder">Latency graph draws live during download test</div>
   {/if}
 </div>
 
@@ -70,6 +77,10 @@
     font-weight: 800;
     line-height: 1;
     letter-spacing: -0.03em;
+  }
+
+  .grade.evaluating {
+    color: var(--subtext);
   }
 
   .delta {

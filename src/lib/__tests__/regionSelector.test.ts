@@ -42,12 +42,12 @@ describe('getGlobalRegions', () => {
 })
 
 describe('buildPingUrl', () => {
-  it('builds an HTTPS URL to the NDT download path', () => {
+  it('builds an HTTPS URL to the server root', () => {
     expect(buildPingUrl('mlab1-lga05.mlab-oti.measurement-lab.org'))
-      .toBe('https://mlab1-lga05.mlab-oti.measurement-lab.org/ndt/v7/download')
+      .toBe('https://mlab1-lga05.mlab-oti.measurement-lab.org/')
   })
 
   it('handles arbitrary hostnames', () => {
-    expect(buildPingUrl('example.com')).toBe('https://example.com/ndt/v7/download')
+    expect(buildPingUrl('example.com')).toBe('https://example.com/')
   })
 })

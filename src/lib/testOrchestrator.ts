@@ -87,7 +87,7 @@ export async function runFullTest(callbacks: OrchestratorCallbacks): Promise<Tes
     : nearestResult.downloadMbps
 
   const results: TestResults = {
-    downloadMbps: avgDownload,
+    downloadMbps: nearestResult.downloadMbps,
     uploadMbps: nearestResult.uploadMbps,
     latencyMs: nearestResult.latencyMs,
     jitterMs: nearestResult.jitterMs,

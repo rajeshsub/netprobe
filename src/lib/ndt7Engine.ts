@@ -49,11 +49,17 @@ export async function runTest(
   serverHostname: string | null,
   callbacks: NDT7Callbacks
 ): Promise<NDT7Result> {
+  // Always go through the locate API so we get a valid access token.
+  // For a specific region server, pass it as the `machine` metadata param —
+  // the locate API uses this to return URLs for that exact machine.
   const baseConfig = {
     userAcceptedDataPolicy: true,
-    loadbalancer: serverHostname ? undefined : config.locateApiUrl,
-    server: serverHostname ?? undefined,
-    metadata: { client_name: config.clientName, client_version: config.clientVersion },
+    loadbalancer: config.locateApiUrl,
+    metadata: {
+      client_name: config.clientName,
+      client_version: config.clientVersion,
+      ...(serverHostname ? { machine: serverHostname } : {}),
+    },
     downloadworkerfile: config.workerBase + 'ndt7-download-worker.js',
     uploadworkerfile: config.workerBase + 'ndt7-upload-worker.js',
   }

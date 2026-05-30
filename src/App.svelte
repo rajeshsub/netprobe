@@ -131,7 +131,7 @@
         />
       </div>
 
-      {#if testState.phase === 'nearest_download' || testState.phase === 'done'}
+      {#if testState.phase !== 'idle' && testState.phase !== 'locating' && testState.phase !== 'error'}
         <BufferBloatPanel
           grade={testState.bufferBloatGrade}
           delta={testState.bufferBloatDelta}
