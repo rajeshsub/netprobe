@@ -39,7 +39,7 @@
   {#if hasData}
     <LatencySparkline {samples} />
   {:else}
-    <div class="placeholder">Latency graph draws live during download test</div>
+    <div class="placeholder">Graph draws live during download test</div>
   {/if}
 </div>
 

@@ -6,19 +6,21 @@
 
   let container: HTMLDivElement
   let chart: uPlot | null = null
+  let chartReady = $state(false)
   let resizeObserver: ResizeObserver | null = null
 
   function makeData(s: number[]): uPlot.AlignedData {
-    const xs = s.map((_, i) => i * 0.25)
+    const xs = s.map((_, i) => i * 0.2)
     return [xs, s]
   }
 
-  function createChart(width: number) {
+  function initChart(width: number) {
+    if (chart) return
     const isDark = !window.matchMedia('(prefers-color-scheme: light)').matches
     const accent = isDark ? '#00e5ff' : '#0284c7'
     const gridColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'
 
-    return new uPlot(
+    chart = new uPlot(
       {
         width,
         height: 110,
@@ -39,34 +41,34 @@
         ],
         series: [
           {},
-          {
-            stroke: accent,
-            width: 2,
-            fill: `${accent}18`,
-          },
+          { stroke: accent, width: 2, fill: `${accent}18` },
         ],
         scales: { y: { min: 0 } },
       },
       makeData(samples),
       container
     )
+    chartReady = true
   }
 
   onMount(() => {
-    // Defer one frame so the container has been laid out and has a real width
-    requestAnimationFrame(() => {
-      chart = createChart(container.clientWidth || 400)
-
-      resizeObserver = new ResizeObserver(entries => {
-        const width = entries[0].contentRect.width
-        if (chart && width > 0) chart.setSize({ width, height: 110 })
-      })
-      resizeObserver.observe(container)
+    resizeObserver = new ResizeObserver(entries => {
+      const width = entries[0].contentRect.width
+      if (width <= 0) return
+      if (!chart) {
+        initChart(width)
+      } else {
+        chart.setSize({ width, height: 110 })
+      }
     })
+    resizeObserver.observe(container)
   })
 
+  // chartReady is $state so this effect re-runs once the chart exists
   $effect(() => {
-    if (chart && samples.length) chart.setData(makeData(samples))
+    if (chartReady && chart && samples.length) {
+      chart.setData(makeData(samples))
+    }
   })
 
   onDestroy(() => {
@@ -82,6 +84,7 @@
     width: 100%;
     overflow: hidden;
     border-radius: 8px;
+    min-height: 110px;
   }
 
   .sparkline :global(.u-wrap) {
