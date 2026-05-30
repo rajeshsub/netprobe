@@ -72,19 +72,8 @@ export async function runTest(
       serverHostnameResolved = server.machine ?? extractHostname(server.urls)
       callbacks.onServerChosen?.(serverHostnameResolved)
     },
-    error: (msg: string) => {
-      console.error('[echometer] locate API error:', msg)
-      callbacks.onError?.(msg)
-    },
+    error: (msg: string) => callbacks.onError?.(msg),
   })
-
-  urlPromise.then(urls => {
-    if (!urls || Object.keys(urls).length === 0) {
-      console.error('[echometer] locate API returned no server URLs')
-    } else {
-      console.log('[echometer] server URLs obtained:', Object.keys(urls))
-    }
-  }).catch(e => console.error('[echometer] urlPromise rejected:', e))
 
   await downloadTest(baseConfig, {
     downloadStart: () => callbacks.onDownloadStart?.(),
