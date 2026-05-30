@@ -42,12 +42,12 @@ describe('getGlobalRegions', () => {
 })
 
 describe('buildPingUrl', () => {
-  it('builds an HTTPS URL to the server root', () => {
+  it('builds an HTTPS URL to the server favicon', () => {
     expect(buildPingUrl('mlab1-lga05.mlab-oti.measurement-lab.org'))
-      .toBe('https://mlab1-lga05.mlab-oti.measurement-lab.org/')
+      .toBe('https://mlab1-lga05.mlab-oti.measurement-lab.org/favicon.ico')
   })
 
   it('handles arbitrary hostnames', () => {
-    expect(buildPingUrl('example.com')).toBe('https://example.com/')
+    expect(buildPingUrl('example.com')).toBe('https://example.com/favicon.ico')
   })
 })

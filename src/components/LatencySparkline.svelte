@@ -53,13 +53,16 @@
   }
 
   onMount(() => {
-    chart = createChart(container.clientWidth || 300)
+    // Defer one frame so the container has been laid out and has a real width
+    requestAnimationFrame(() => {
+      chart = createChart(container.clientWidth || 400)
 
-    resizeObserver = new ResizeObserver(entries => {
-      const width = entries[0].contentRect.width
-      if (chart && width > 0) chart.setSize({ width, height: 110 })
+      resizeObserver = new ResizeObserver(entries => {
+        const width = entries[0].contentRect.width
+        if (chart && width > 0) chart.setSize({ width, height: 110 })
+      })
+      resizeObserver.observe(container)
     })
-    resizeObserver.observe(container)
   })
 
   $effect(() => {

@@ -10,7 +10,7 @@ export function getGlobalRegions(): RegionServer[] {
 }
 
 export function buildPingUrl(hostname: string): string {
-  return `https://${hostname}/`
+  return `https://${hostname}/favicon.ico`
 }
 
 export async function selectServers() {
