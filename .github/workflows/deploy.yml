@@ -30,7 +30,7 @@ jobs:
       - name: Build
         run: npm run build
         env:
-          VITE_BASE_URL: ${{ vars.VITE_BASE_URL || '/' }}
+          VITE_BASE_URL: ${{ vars.VITE_BASE_URL || '/echometer/' }}
           VITE_LOCATE_API_URL: ${{ vars.VITE_LOCATE_API_URL || 'https://locate.measurementlab.net/v2/nearest/ndt/ndt7' }}
           VITE_CLIENT_NAME: ${{ vars.VITE_CLIENT_NAME || 'echometer' }}
           VITE_CLIENT_VERSION: ${{ vars.VITE_CLIENT_VERSION || '1.0.0' }}
