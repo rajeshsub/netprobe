@@ -45,6 +45,82 @@ function rttFromServerMeasurement(m: Record<string, unknown>): number {
   return rtt / 1000  // μs → ms
 }
 
+// Build WebSocket URL map for a known server, bypassing the locate API entirely.
+// Used by ndt7DirectProvider and global region tests to avoid 429 rate-limit errors.
+export function buildDirectUrlMap(hostname: string): Record<string, string> {
+  return {
+    'wss:///ndt/v7/download': `wss://${hostname}/ndt/v7/download`,
+    'wss:///ndt/v7/upload': `wss://${hostname}/ndt/v7/upload`,
+  }
+}
+
+export async function runTestDirect(
+  hostname: string,
+  callbacks: NDT7Callbacks
+): Promise<NDT7Result> {
+  const baseConfig = {
+    userAcceptedDataPolicy: true,
+    loadbalancer: config.locateApiUrl,
+    metadata: {
+      client_name: config.clientName,
+      client_version: config.clientVersion,
+    },
+    downloadworkerfile: config.workerBase + 'ndt7-download-worker.js',
+    uploadworkerfile: config.workerBase + 'ndt7-upload-worker.js',
+  }
+
+  const urlPromise = Promise.resolve(buildDirectUrlMap(hostname))
+  let downloadMbps = 0
+  let uploadMbps = 0
+  let latencyMs = 0
+  let jitterMs = 0
+
+  callbacks.onServerChosen?.(hostname)
+
+  await downloadTest(baseConfig, {
+    downloadStart: () => callbacks.onDownloadStart?.(),
+    downloadMeasurement: ({ Source, Data }: { Source: string; Data: Record<string, unknown> }) => {
+      if (Source === 'client') {
+        const sample = {
+          elapsedSeconds: (Data.ElapsedTime as number) ?? 0,
+          mbps: mbpsFromClientData(Data as { MeanClientMbps?: number }),
+        }
+        downloadMbps = sample.mbps
+        callbacks.onDownloadSample?.(sample)
+      } else {
+        const rtt = rttFromServerMeasurement(Data)
+        if (rtt > 0) callbacks.onLatencySample?.(rtt)
+        const { latencyMs: l, jitterMs: j } = latencyFromServerMeasurement(Data as { TCPInfo?: { MinRTT?: number; RTTVar?: number } })
+        if (l > 0) { latencyMs = l; jitterMs = j }
+      }
+    },
+    downloadComplete: ({ LastServerMeasurement }: { LastServerMeasurement?: { TCPInfo?: { MinRTT?: number; RTTVar?: number } } }) => {
+      if (LastServerMeasurement) {
+        const { latencyMs: l, jitterMs: j } = latencyFromServerMeasurement(LastServerMeasurement)
+        if (l > 0) { latencyMs = l; jitterMs = j }
+      }
+      callbacks.onDownloadComplete?.()
+    },
+    error: (msg: string) => callbacks.onError?.(msg),
+  }, urlPromise)
+
+  await uploadTest(baseConfig, {
+    uploadMeasurement: ({ Source, Data }: { Source: string; Data: Record<string, unknown> }) => {
+      if (Source === 'client') {
+        const sample = {
+          elapsedSeconds: (Data.ElapsedTime as number) ?? 0,
+          mbps: mbpsFromClientData(Data as { MeanClientMbps?: number }),
+        }
+        uploadMbps = sample.mbps
+        callbacks.onUploadSample?.(sample)
+      }
+    },
+    error: (msg: string) => callbacks.onError?.(msg),
+  }, urlPromise)
+
+  return { downloadMbps, uploadMbps, latencyMs, jitterMs, serverHostname: hostname }
+}
+
 export async function runTest(
   serverHostname: string | null,
   callbacks: NDT7Callbacks

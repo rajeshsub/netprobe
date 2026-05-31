@@ -1,9 +1,11 @@
-import { runTest } from './ndt7Engine'
+import { runTestDirect } from './ndt7Engine'
 import { measureBufferBloat } from './bufferBloatDetector'
 import { buildPingUrl, getGlobalRegions } from './regionSelector'
+import { runWithFallback, DEFAULT_PROVIDERS } from './speedProviders'
 import type { BufferBloatResult } from './bufferBloatDetector'
 import type { RegionResult, TestResults } from './urlSerializer'
 import type { SpeedSample } from './ndt7Engine'
+import type { ProviderFn } from './speedProviders'
 
 export type Phase =
   | 'idle'
@@ -24,7 +26,10 @@ export interface OrchestratorCallbacks {
   onError(msg: string): void
 }
 
-export async function runFullTest(callbacks: OrchestratorCallbacks): Promise<TestResults> {
+export async function runFullTest(
+  callbacks: OrchestratorCallbacks,
+  providers: ProviderFn[] = DEFAULT_PROVIDERS
+): Promise<TestResults> {
   callbacks.onPhase('locating')
 
   let bufferBloat: BufferBloatResult = { baseline: 0, underLoad: 0, delta: 0, grade: 'A', samples: [] }
@@ -32,7 +37,7 @@ export async function runFullTest(callbacks: OrchestratorCallbacks): Promise<Tes
   let downloadResolve: (() => void) | null = null
   const downloadDone = new Promise<void>(resolve => { downloadResolve = resolve })
 
-  const nearestResult = await runTest(null, {
+  const nearestResult = await runWithFallback(providers, {
     onServerChosen: (hostname) => {
       pingUrl = buildPingUrl(hostname)
       callbacks.onNearestServer(hostname)
@@ -50,16 +55,17 @@ export async function runFullTest(callbacks: OrchestratorCallbacks): Promise<Tes
       callbacks.onPhase('nearest_upload')
     },
     onUploadSample: (s) => callbacks.onUploadSample(s),
-    onError: (msg) => callbacks.onError(msg),
   })
 
   callbacks.onPhase('global')
 
   const completedRegions: RegionResult[] = []
 
+  // Use runTestDirect for all global regions — bypasses the locate API entirely,
+  // so a rate-limited locate API cannot block region tests.
   await Promise.allSettled(
     getGlobalRegions().map(region =>
-      runTest(region.hostname, { onError: () => {} })
+      runTestDirect(region.hostname, { onError: () => {} })
         .then(result => {
           if (result.downloadMbps === 0 && result.uploadMbps === 0) throw new Error('no data')
           const r: RegionResult = {

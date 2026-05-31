@@ -3,6 +3,7 @@
   import { testState } from './stores/testState.svelte'
   import { runFullTest } from './lib/testOrchestrator'
   import { encode, decode } from './lib/urlSerializer'
+  import { config } from './config'
   import SpeedGauge from './components/SpeedGauge.svelte'
   import BufferBloatPanel from './components/BufferBloatPanel.svelte'
   import RegionTable from './components/RegionTable.svelte'
@@ -30,14 +31,43 @@
       .catch(e => console.error('[netprobe] worker file fetch failed:', e))
   })
 
-  const phaseLabel: Record<string, string> = {
-    locating:         'Finding nearest server...',
-    nearest_download: 'Measuring download speed...',
-    nearest_upload:   'Measuring upload speed...',
-    global:           'Testing global regions...',
-    done:             'Test complete',
-    error:            'Something went wrong',
+  const TOTAL_REGIONS = 5
+
+  // Step definitions — order matters for progress tracking
+  const STEPS = [
+    { id: 'server',       label: 'Server discovery' },
+    { id: 'download',     label: 'Download test' },
+    { id: 'buffer_bloat', label: 'Buffer bloat' },
+    { id: 'upload',       label: 'Upload test' },
+    { id: 'global',       label: 'Global regions' },
+  ] as const
+
+  type StepId = typeof STEPS[number]['id']
+
+  function isStepDone(id: StepId): boolean {
+    const ph = testState.phase
+    switch (id) {
+      case 'server':       return ['nearest_download', 'nearest_upload', 'global', 'done'].includes(ph)
+      case 'download':     return ['nearest_upload', 'global', 'done'].includes(ph)
+      case 'buffer_bloat': return ['nearest_upload', 'global', 'done'].includes(ph)
+      case 'upload':       return ['global', 'done'].includes(ph)
+      case 'global':       return ph === 'done'
+    }
   }
+
+  function isStepActive(id: StepId): boolean {
+    const ph = testState.phase
+    switch (id) {
+      case 'server':       return ph === 'locating'
+      case 'download':     return ph === 'nearest_download'
+      case 'buffer_bloat': return ph === 'nearest_download'
+      case 'upload':       return ph === 'nearest_upload'
+      case 'global':       return ph === 'global'
+    }
+  }
+
+  const completedStepCount = $derived(STEPS.filter(s => isStepDone(s.id)).length)
+  const progressPct = $derived(Math.round((completedStepCount / STEPS.length) * 100))
 
   const isRunning = $derived(
     testState.phase !== 'idle' &&
@@ -111,20 +141,60 @@
       </div>
     {:else}
       {#if isRunning || isDone}
-        <div class="status-panel" class:done={isDone && testProducedData} class:warn={isDone && !testProducedData}>
-          {#if isDone && testProducedData}
-            <span class="done-dot" aria-hidden="true">✓</span>
-            <span>All steps complete</span>
-          {:else if isDone && !testProducedData}
-            <span class="warn-dot" aria-hidden="true">!</span>
-            <span>
-              No data returned. Check the browser console (F12 → Console) for the error.
-              {#if testState.error} <em>{testState.error}</em>{/if}
-            </span>
-          {:else}
-            <span class="pulse-dot" aria-hidden="true"></span>
-            <span>{phaseLabel[testState.phase] ?? ''}</span>
-          {/if}
+        <div class="progress-panel" class:panel-done={isDone && testProducedData} class:panel-warn={isDone && !testProducedData}>
+          <!-- Progress bar row -->
+          <div class="progress-header">
+            {#if isDone && testProducedData}
+              <span class="progress-label done-label">
+                <span class="done-tick" aria-hidden="true">✓</span>
+                All 5 steps complete
+              </span>
+            {:else if isDone && !testProducedData}
+              <span class="progress-label warn-label">
+                <span class="warn-icon" aria-hidden="true">!</span>
+                No data returned. Check browser console (F12) for details.
+                {#if testState.error}<em>{testState.error}</em>{/if}
+              </span>
+            {:else}
+              <span class="progress-label">Step {completedStepCount} of {STEPS.length}</span>
+            {/if}
+            <div class="progress-track" role="progressbar" aria-valuenow={progressPct} aria-valuemin={0} aria-valuemax={100}>
+              <div class="progress-fill" style="width: {progressPct}%"></div>
+            </div>
+          </div>
+
+          <!-- Step checklist -->
+          <ol class="step-list">
+            {#each STEPS as step (step.id)}
+              {@const done = isStepDone(step.id)}
+              {@const active = isStepActive(step.id)}
+              <li class="step" class:step-done={done} class:step-active={active}>
+                <span class="step-icon" aria-hidden="true">
+                  {#if done}
+                    <span class="tick">✓</span>
+                  {:else if active}
+                    <span class="pulse-dot"></span>
+                  {:else}
+                    <span class="empty-dot"></span>
+                  {/if}
+                </span>
+                <span class="step-label">{step.label}</span>
+                <span class="step-hint">
+                  {#if step.id === 'server' && testState.nearestRegion}
+                    {testState.nearestRegion.split('.')[0]}
+                  {:else if step.id === 'download' && testState.downloadMbps > 0 && (done || active)}
+                    {testState.downloadMbps.toFixed(0)} Mbps
+                  {:else if step.id === 'buffer_bloat' && done}
+                    Grade {testState.bufferBloatGrade}
+                  {:else if step.id === 'upload' && testState.uploadMbps > 0 && (done || active)}
+                    {testState.uploadMbps.toFixed(0)} Mbps
+                  {:else if step.id === 'global' && testState.regions.length > 0}
+                    {testState.regions.length} / {TOTAL_REGIONS}
+                  {/if}
+                </span>
+              </li>
+            {/each}
+          </ol>
         </div>
       {/if}
 
@@ -194,7 +264,8 @@
 
   <footer class="container">
     <p>
-      Tests run via <a href="https://www.measurementlab.net/" target="_blank" rel="noreferrer">M-Lab NDT7</a>.
+      Tests run via <a href="https://www.measurementlab.net/" target="_blank" rel="noreferrer">M-Lab NDT7</a>,
+      <a href="https://speed.cloudflare.com" target="_blank" rel="noreferrer">Cloudflare</a>, and fallback providers.
       No results stored anywhere.
     </p>
   </footer>
@@ -283,55 +354,173 @@
     line-height: 1.65;
   }
 
-  .status-panel {
-    display: flex;
-    align-items: center;
-    gap: 0.6rem;
-    font-size: 0.82rem;
-    color: var(--subtext);
+  /* ── Progress panel ─────────────────────────────────────── */
+
+  .progress-panel {
     background: var(--surface);
     border: 1px solid var(--border-subtle);
-    border-radius: 10px;
-    padding: 0.7rem 1rem;
-    letter-spacing: 0.01em;
+    border-radius: 12px;
+    padding: 0.875rem 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    transition: border-color 0.3s;
   }
 
-  .status-panel.done {
+  .progress-panel.panel-done {
     border-color: var(--grade-a);
-    color: var(--grade-a);
   }
 
-  .status-panel.warn {
+  .progress-panel.panel-warn {
     border-color: var(--grade-c);
+  }
+
+  .progress-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .progress-label {
+    font-size: 0.78rem;
+    color: var(--subtext);
+    white-space: nowrap;
+    letter-spacing: 0.01em;
+    flex-shrink: 0;
+    min-width: 7.5rem;
+  }
+
+  .done-label {
+    color: var(--grade-a);
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+  }
+
+  .warn-label {
     color: var(--grade-c);
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
   }
 
-  .done-dot {
-    font-size: 0.85rem;
+  .done-tick {
     font-weight: 700;
+    font-size: 0.85rem;
+  }
+
+  .warn-icon {
+    font-weight: 800;
+    font-size: 0.85rem;
+  }
+
+  .progress-track {
+    flex: 1;
+    height: 4px;
+    background: var(--border-subtle);
+    border-radius: 99px;
+    overflow: hidden;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 99px;
+    transition: width 0.4s ease;
+    box-shadow: 0 0 6px var(--accent-glow);
+  }
+
+  /* ── Step list ─────────────────────────────────────────── */
+
+  .step-list {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .step {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    padding: 0.3rem 0;
+    font-size: 0.8rem;
+    color: var(--subtext);
+    border-top: 1px solid transparent;
+    transition: color 0.2s;
+  }
+
+  .step:first-child {
+    border-top: 1px solid var(--border-subtle);
+  }
+
+  .step + .step {
+    border-top: 1px solid var(--border-subtle);
+  }
+
+  .step.step-done {
+    color: var(--text);
+  }
+
+  .step.step-active {
+    color: var(--text);
+  }
+
+  .step-icon {
+    width: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     flex-shrink: 0;
   }
 
-  .warn-dot {
-    font-size: 0.85rem;
-    font-weight: 800;
-    flex-shrink: 0;
+  .tick {
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--grade-a);
+    line-height: 1;
   }
 
   .pulse-dot {
+    display: block;
     width: 6px;
     height: 6px;
     border-radius: 50%;
     background: var(--accent);
     box-shadow: 0 0 6px var(--accent);
-    flex-shrink: 0;
     animation: pulse 1.2s ease-in-out infinite;
+  }
+
+  .empty-dot {
+    display: block;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    border: 1px solid var(--border-subtle);
+    background: transparent;
   }
 
   @keyframes pulse {
     0%, 100% { opacity: 1; transform: scale(1) }
     50% { opacity: 0.3; transform: scale(0.7) }
   }
+
+  .step-label {
+    flex: 1;
+  }
+
+  .step-hint {
+    font-size: 0.72rem;
+    color: var(--subtext);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.01em;
+  }
+
+  .step.step-done .step-hint {
+    color: var(--accent);
+  }
+
+  /* ── Metrics grid ────────────────────────────────────────── */
 
   .metrics-grid {
     display: grid;
@@ -344,6 +533,8 @@
       grid-template-columns: repeat(2, 1fr);
     }
   }
+
+  /* ── Buttons ─────────────────────────────────────────────── */
 
   .start-btn {
     background: var(--accent);

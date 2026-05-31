@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-const { mockRunTest, mockMeasureBufferBloat } = vi.hoisted(() => ({
-  mockRunTest: vi.fn(),
+const { mockRunTestDirect, mockMeasureBufferBloat } = vi.hoisted(() => ({
+  mockRunTestDirect: vi.fn(),
   mockMeasureBufferBloat: vi.fn(),
 }))
 
@@ -21,7 +21,11 @@ vi.mock('../../config', () => ({
   },
 }))
 
-vi.mock('../ndt7Engine', () => ({ runTest: mockRunTest }))
+vi.mock('../ndt7Engine', () => ({
+  runTest: vi.fn(),
+  runTestDirect: mockRunTestDirect,
+  buildDirectUrlMap: vi.fn((h: string) => ({ 'wss:///ndt/v7/download': `wss://${h}/ndt/v7/download` })),
+}))
 vi.mock('../bufferBloatDetector', () => ({
   measureBufferBloat: mockMeasureBufferBloat,
   computeBufferBloat: vi.fn(),
@@ -40,6 +44,7 @@ vi.mock('../regionSelector', () => ({
 }))
 
 import { runFullTest } from '../testOrchestrator'
+import type { ProviderFn, ProviderCallbacks } from '../speedProviders'
 
 const bloatResult = { baseline: 12, underLoad: 40, delta: 28, grade: 'B' as const, samples: [12, 40, 38] }
 
@@ -53,10 +58,10 @@ const regionResult = {
   serverHostname: 'mlab1-lax05.mlab-oti.measurement-lab.org',
 }
 
-type RunTestCbs = {
-  onServerChosen?: (h: string) => void
-  onDownloadComplete?: () => void
-  onError?: (m: string) => void
+type ProviderCbs = ProviderCallbacks
+
+function makeNearestProvider(impl: (cb: ProviderCbs) => Promise<typeof nearestResult>): ProviderFn {
+  return impl as unknown as ProviderFn
 }
 
 function makeCallbacks() {
@@ -74,51 +79,48 @@ function makeCallbacks() {
 beforeEach(() => {
   vi.clearAllMocks()
   mockMeasureBufferBloat.mockResolvedValue(bloatResult)
+  mockRunTestDirect.mockResolvedValue(regionResult)
 })
 
 describe('runFullTest', () => {
-  it('runs nearest server test before global tests', async () => {
+  it('calls nearest provider before global region tests', async () => {
     const order: string[] = []
-    mockRunTest
-      .mockImplementationOnce(async (_: null, cbs: RunTestCbs) => {
-        order.push('nearest')
-        cbs.onServerChosen?.('mlab1-lga05.mlab-oti.measurement-lab.org')
-        await new Promise<void>(r => setTimeout(r, 10))
-        cbs.onDownloadComplete?.()
-        return nearestResult
-      })
-      .mockImplementation(async () => { order.push('region'); return regionResult })
+    const nearestProvider = makeNearestProvider(async (cb) => {
+      order.push('nearest')
+      cb.onServerChosen?.('mlab1-lga05.mlab-oti.measurement-lab.org')
+      cb.onDownloadComplete?.()
+      return nearestResult
+    })
+    mockRunTestDirect.mockImplementation(async () => { order.push('region'); return regionResult })
 
-    await runFullTest(makeCallbacks())
+    await runFullTest(makeCallbacks(), [nearestProvider])
     expect(order[0]).toBe('nearest')
     expect(order.slice(1).every(o => o === 'region')).toBe(true)
   })
 
-  it('runs all 5 global region tests', async () => {
-    mockRunTest
-      .mockImplementationOnce(async (_: null, cbs: RunTestCbs) => {
-        cbs.onServerChosen?.('nearest-host')
-        cbs.onDownloadComplete?.()
-        return nearestResult
-      })
-      .mockResolvedValue(regionResult)
+  it('runs all 5 global region tests via runTestDirect', async () => {
+    const nearestProvider = makeNearestProvider(async (cb) => {
+      cb.onServerChosen?.('nearest-host')
+      cb.onDownloadComplete?.()
+      return nearestResult
+    })
 
-    await runFullTest(makeCallbacks())
-    expect(mockRunTest).toHaveBeenCalledTimes(6)
+    await runFullTest(makeCallbacks(), [nearestProvider])
+    expect(mockRunTestDirect).toHaveBeenCalledTimes(5)
   })
 
   it('a failed region does not abort others', async () => {
-    mockRunTest
-      .mockImplementationOnce(async (_: null, cbs: RunTestCbs) => {
-        cbs.onServerChosen?.('nearest-host')
-        cbs.onDownloadComplete?.()
-        return nearestResult
-      })
+    const nearestProvider = makeNearestProvider(async (cb) => {
+      cb.onServerChosen?.('nearest-host')
+      cb.onDownloadComplete?.()
+      return nearestResult
+    })
+    mockRunTestDirect
       .mockRejectedValueOnce(new Error('region 1 failed'))
       .mockResolvedValue(regionResult)
 
     const callbacks = makeCallbacks()
-    await runFullTest(callbacks)
+    await runFullTest(callbacks, [nearestProvider])
 
     const regions = callbacks.onRegionComplete.mock.calls.map((c: unknown[]) => c[0] as { error: string | null })
     expect(regions.some(r => r.error !== null)).toBe(true)
@@ -126,30 +128,26 @@ describe('runFullTest', () => {
   })
 
   it('streams each region result immediately via onRegionComplete', async () => {
-    mockRunTest
-      .mockImplementationOnce(async (_: null, cbs: RunTestCbs) => {
-        cbs.onServerChosen?.('nearest-host')
-        cbs.onDownloadComplete?.()
-        return nearestResult
-      })
-      .mockResolvedValue(regionResult)
+    const nearestProvider = makeNearestProvider(async (cb) => {
+      cb.onServerChosen?.('nearest-host')
+      cb.onDownloadComplete?.()
+      return nearestResult
+    })
 
     const callbacks = makeCallbacks()
-    await runFullTest(callbacks)
+    await runFullTest(callbacks, [nearestProvider])
     expect(callbacks.onRegionComplete).toHaveBeenCalledTimes(5)
   })
 
   it('transitions through expected phases in order', async () => {
-    mockRunTest
-      .mockImplementationOnce(async (_: null, cbs: RunTestCbs) => {
-        cbs.onServerChosen?.('nearest-host')
-        cbs.onDownloadComplete?.()
-        return nearestResult
-      })
-      .mockResolvedValue(regionResult)
+    const nearestProvider = makeNearestProvider(async (cb) => {
+      cb.onServerChosen?.('nearest-host')
+      cb.onDownloadComplete?.()
+      return nearestResult
+    })
 
     const callbacks = makeCallbacks()
-    await runFullTest(callbacks)
+    await runFullTest(callbacks, [nearestProvider])
 
     const phases = callbacks.onPhase.mock.calls.map((c: unknown[]) => c[0] as string)
     expect(phases).toContain('locating')
@@ -157,5 +155,39 @@ describe('runFullTest', () => {
     expect(phases).toContain('global')
     expect(phases).toContain('done')
     expect(phases.indexOf('locating')).toBeLessThan(phases.indexOf('done'))
+  })
+
+  it('falls back to second provider when first fails', async () => {
+    const failingProvider = makeNearestProvider(async () => { throw new Error('rate limited') })
+    const successProvider = makeNearestProvider(async (cb) => {
+      cb.onServerChosen?.('fallback-host')
+      cb.onDownloadComplete?.()
+      return nearestResult
+    })
+
+    const callbacks = makeCallbacks()
+    const result = await runFullTest(callbacks, [failingProvider, successProvider])
+    expect(result.downloadMbps).toBe(450)
+  })
+
+  it('throws when all providers fail', async () => {
+    const fail = makeNearestProvider(async () => { throw new Error('all down') })
+    await expect(runFullTest(makeCallbacks(), [fail])).rejects.toThrow()
+  })
+
+  it('global regions are marked unavailable when runTestDirect fails', async () => {
+    const nearestProvider = makeNearestProvider(async (cb) => {
+      cb.onServerChosen?.('nearest-host')
+      cb.onDownloadComplete?.()
+      return nearestResult
+    })
+    mockRunTestDirect.mockRejectedValue(new Error('server down'))
+
+    const callbacks = makeCallbacks()
+    await runFullTest(callbacks, [nearestProvider])
+
+    const regions = callbacks.onRegionComplete.mock.calls.map((c: unknown[]) => c[0] as { error: string | null })
+    expect(regions.every(r => r.error === 'unavailable')).toBe(true)
+    expect(regions).toHaveLength(5)
   })
 })
