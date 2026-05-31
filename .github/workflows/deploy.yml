@@ -37,11 +37,11 @@ jobs:
           VITE_LOCATE_API_URL: ${{ vars.VITE_LOCATE_API_URL || 'https://locate.measurementlab.net/v2/nearest/ndt/ndt7' }}
           VITE_CLIENT_NAME: ${{ vars.VITE_CLIENT_NAME || 'netprobe' }}
           VITE_CLIENT_VERSION: ${{ vars.VITE_CLIENT_VERSION || '1.0.0' }}
-          VITE_REGION_US_EAST: ${{ vars.VITE_REGION_US_EAST || 'mlab1-lga05.mlab-oti.measurement-lab.org' }}
-          VITE_REGION_US_WEST: ${{ vars.VITE_REGION_US_WEST || 'mlab1-lax05.mlab-oti.measurement-lab.org' }}
-          VITE_REGION_EU_WEST: ${{ vars.VITE_REGION_EU_WEST || 'mlab1-lhr05.mlab-oti.measurement-lab.org' }}
-          VITE_REGION_ASIA_EAST: ${{ vars.VITE_REGION_ASIA_EAST || 'mlab1-nrt05.mlab-oti.measurement-lab.org' }}
-          VITE_REGION_OCEANIA: ${{ vars.VITE_REGION_OCEANIA || 'mlab1-syd05.mlab-oti.measurement-lab.org' }}
+          VITE_REGION_US_EAST: ${{ vars.VITE_REGION_US_EAST || 'speedtest.newark.linode.com' }}
+          VITE_REGION_US_WEST: ${{ vars.VITE_REGION_US_WEST || 'speedtest.fremont.linode.com' }}
+          VITE_REGION_EU_WEST: ${{ vars.VITE_REGION_EU_WEST || 'speedtest.london.linode.com' }}
+          VITE_REGION_ASIA_EAST: ${{ vars.VITE_REGION_ASIA_EAST || 'speedtest.tokyo2.linode.com' }}
+          VITE_REGION_OCEANIA: ${{ vars.VITE_REGION_OCEANIA || 'speedtest.sydney.linode.com' }}
 
       - uses: actions/upload-pages-artifact@v3
         with:

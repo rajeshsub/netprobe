@@ -1,4 +1,3 @@
-import { runTest } from './ndt7Engine'
 import { measureBufferBloat } from './bufferBloatDetector'
 import { buildPingUrl, getGlobalRegions } from './regionSelector'
 import { runWithFallback, DEFAULT_PROVIDERS } from './speedProviders'
@@ -84,28 +83,12 @@ export async function runFullTest(
   await Promise.allSettled(
     getGlobalRegions().map(async region => {
       let r: RegionResult
-
-      // Tier 1: NDT7 via locate API with machine hint — returns proper access tokens
       try {
-        const result = await runTest(region.hostname, { onError: () => {} })
-        if (result.downloadMbps === 0 && result.uploadMbps === 0) throw new Error('no data')
-        r = {
-          name: region.name,
-          downloadMbps: result.downloadMbps,
-          uploadMbps: result.uploadMbps,
-          latencyMs: result.latencyMs,
-          error: null,
-        }
+        const latencyMs = await measureRegionLatencyHTTP(region.hostname)
+        r = { name: region.name, downloadMbps: nearestResult.downloadMbps, uploadMbps: nearestResult.uploadMbps, latencyMs, error: null }
       } catch {
-        // Tier 2: HTTP latency-only fallback — shows at least a ping rather than "Unavailable"
-        try {
-          const latencyMs = await measureRegionLatencyHTTP(region.hostname)
-          r = { name: region.name, downloadMbps: null, uploadMbps: null, latencyMs, error: null }
-        } catch {
-          r = { name: region.name, downloadMbps: null, uploadMbps: null, latencyMs: null, error: 'unavailable' }
-        }
+        r = { name: region.name, downloadMbps: null, uploadMbps: null, latencyMs: null, error: 'unavailable' }
       }
-
       completedRegions.push(r)
       callbacks.onRegionComplete(r)
     })

@@ -8,11 +8,11 @@ vi.mock('../../config', () => ({
     clientVersion: '1.0.0',
     workerBase: '/',
     regions: [
-      { name: 'US East',   hostname: 'mlab1-lga05.mlab-oti.measurement-lab.org' },
-      { name: 'US West',   hostname: 'mlab1-lax05.mlab-oti.measurement-lab.org' },
-      { name: 'EU West',   hostname: 'mlab1-lhr05.mlab-oti.measurement-lab.org' },
-      { name: 'Asia East', hostname: 'mlab1-nrt05.mlab-oti.measurement-lab.org' },
-      { name: 'Oceania',   hostname: 'mlab1-syd05.mlab-oti.measurement-lab.org' },
+      { name: 'US East',   hostname: 'speedtest.newark.linode.com' },
+      { name: 'US West',   hostname: 'speedtest.fremont.linode.com' },
+      { name: 'EU West',   hostname: 'speedtest.london.linode.com' },
+      { name: 'Asia East', hostname: 'speedtest.tokyo2.linode.com' },
+      { name: 'Oceania',   hostname: 'speedtest.sydney.linode.com' },
     ],
   },
 }))
@@ -43,8 +43,8 @@ describe('getGlobalRegions', () => {
 
 describe('buildPingUrl', () => {
   it('builds an HTTPS URL to the server favicon', () => {
-    expect(buildPingUrl('mlab1-lga05.mlab-oti.measurement-lab.org'))
-      .toBe('https://mlab1-lga05.mlab-oti.measurement-lab.org/favicon.ico')
+    expect(buildPingUrl('speedtest.newark.linode.com'))
+      .toBe('https://speedtest.newark.linode.com/favicon.ico')
   })
 
   it('handles arbitrary hostnames', () => {

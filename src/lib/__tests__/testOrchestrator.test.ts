@@ -1,8 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
-const { mockRunTest, mockRunTestDirect, mockMeasureBufferBloat } = vi.hoisted(() => ({
-  mockRunTest: vi.fn(),
-  mockRunTestDirect: vi.fn(),
+const { mockMeasureBufferBloat } = vi.hoisted(() => ({
   mockMeasureBufferBloat: vi.fn(),
 }))
 
@@ -13,18 +11,18 @@ vi.mock('../../config', () => ({
     clientVersion: '1.0.0',
     workerBase: '/',
     regions: [
-      { name: 'US East',   hostname: 'mlab1-lga05.mlab-oti.measurement-lab.org' },
-      { name: 'US West',   hostname: 'mlab1-lax05.mlab-oti.measurement-lab.org' },
-      { name: 'EU West',   hostname: 'mlab1-lhr05.mlab-oti.measurement-lab.org' },
-      { name: 'Asia East', hostname: 'mlab1-nrt05.mlab-oti.measurement-lab.org' },
-      { name: 'Oceania',   hostname: 'mlab1-syd05.mlab-oti.measurement-lab.org' },
+      { name: 'US East',   hostname: 'speedtest.newark.linode.com' },
+      { name: 'US West',   hostname: 'speedtest.fremont.linode.com' },
+      { name: 'EU West',   hostname: 'speedtest.london.linode.com' },
+      { name: 'Asia East', hostname: 'speedtest.tokyo2.linode.com' },
+      { name: 'Oceania',   hostname: 'speedtest.sydney.linode.com' },
     ],
   },
 }))
 
 vi.mock('../ndt7Engine', () => ({
-  runTest: mockRunTest,
-  runTestDirect: mockRunTestDirect,
+  runTest: vi.fn(),
+  runTestDirect: vi.fn(),
   buildDirectUrlMap: vi.fn((h: string) => ({ '///ndt/v7/download': `wss://${h}/ndt/v7/download` })),
 }))
 vi.mock('../bufferBloatDetector', () => ({
@@ -35,11 +33,11 @@ vi.mock('../bufferBloatDetector', () => ({
 vi.mock('../regionSelector', () => ({
   buildPingUrl: (h: string) => `https://${h}/favicon.ico`,
   getGlobalRegions: () => [
-    { name: 'US East',   hostname: 'mlab1-lga05.mlab-oti.measurement-lab.org' },
-    { name: 'US West',   hostname: 'mlab1-lax05.mlab-oti.measurement-lab.org' },
-    { name: 'EU West',   hostname: 'mlab1-lhr05.mlab-oti.measurement-lab.org' },
-    { name: 'Asia East', hostname: 'mlab1-nrt05.mlab-oti.measurement-lab.org' },
-    { name: 'Oceania',   hostname: 'mlab1-syd05.mlab-oti.measurement-lab.org' },
+    { name: 'US East',   hostname: 'speedtest.newark.linode.com' },
+    { name: 'US West',   hostname: 'speedtest.fremont.linode.com' },
+    { name: 'EU West',   hostname: 'speedtest.london.linode.com' },
+    { name: 'Asia East', hostname: 'speedtest.tokyo2.linode.com' },
+    { name: 'Oceania',   hostname: 'speedtest.sydney.linode.com' },
   ],
   selectServers: vi.fn(),
 }))
@@ -51,12 +49,7 @@ const bloatResult = { baseline: 12, underLoad: 40, delta: 28, grade: 'B' as cons
 
 const nearestResult = {
   downloadMbps: 450, uploadMbps: 120, latencyMs: 12, jitterMs: 3,
-  serverHostname: 'mlab1-lga05.mlab-oti.measurement-lab.org',
-}
-
-const regionResult = {
-  downloadMbps: 300, uploadMbps: 100, latencyMs: 20, jitterMs: 5,
-  serverHostname: 'mlab1-lax05.mlab-oti.measurement-lab.org',
+  serverHostname: 'speedtest.newark.linode.com',
 }
 
 type ProviderCbs = ProviderCallbacks
@@ -77,12 +70,12 @@ function makeCallbacks() {
   }
 }
 
+// Stub fetch to reject by default so HTTP latency probes fail fast without real network calls.
+// Individual tests can override with vi.stubGlobal or a resolved mock for specific scenarios.
 beforeEach(() => {
   vi.clearAllMocks()
-  // Stub fetch so the HTTP latency fallback fails fast without real network requests
   vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('fetch stubbed in tests')))
   mockMeasureBufferBloat.mockResolvedValue(bloatResult)
-  mockRunTest.mockResolvedValue(regionResult)
 })
 
 afterEach(() => {
@@ -94,26 +87,25 @@ describe('runFullTest', () => {
     const order: string[] = []
     const nearestProvider = makeNearestProvider(async (cb) => {
       order.push('nearest')
-      cb.onServerChosen?.('mlab1-lga05.mlab-oti.measurement-lab.org')
+      cb.onServerChosen?.('speedtest.newark.linode.com')
       cb.onDownloadComplete?.()
       return nearestResult
     })
-    mockRunTest.mockImplementation(async () => { order.push('region'); return regionResult })
 
     await runFullTest(makeCallbacks(), [nearestProvider])
     expect(order[0]).toBe('nearest')
-    expect(order.slice(1).every(o => o === 'region')).toBe(true)
   })
 
-  it('runs all 5 global region tests via runTest', async () => {
+  it('probes all 5 global regions', async () => {
     const nearestProvider = makeNearestProvider(async (cb) => {
       cb.onServerChosen?.('nearest-host')
       cb.onDownloadComplete?.()
       return nearestResult
     })
 
-    await runFullTest(makeCallbacks(), [nearestProvider])
-    expect(mockRunTest).toHaveBeenCalledTimes(5)
+    const callbacks = makeCallbacks()
+    await runFullTest(callbacks, [nearestProvider])
+    expect(callbacks.onRegionComplete).toHaveBeenCalledTimes(5)
   })
 
   it('a failed region does not abort others', async () => {
@@ -122,16 +114,11 @@ describe('runFullTest', () => {
       cb.onDownloadComplete?.()
       return nearestResult
     })
-    mockRunTest
-      .mockRejectedValueOnce(new Error('region 1 failed'))
-      .mockResolvedValue(regionResult)
-
+    // First region's fetch fails (stubbed globally), the rest also fail — all unavailable,
+    // but onRegionComplete is still called for all 5 (no abort).
     const callbacks = makeCallbacks()
     await runFullTest(callbacks, [nearestProvider])
-
-    const regions = callbacks.onRegionComplete.mock.calls.map((c: unknown[]) => c[0] as { error: string | null })
-    expect(regions.some(r => r.error !== null)).toBe(true)
-    expect(regions.some(r => r.error === null)).toBe(true)
+    expect(callbacks.onRegionComplete).toHaveBeenCalledTimes(5)
   })
 
   it('streams each region result immediately via onRegionComplete', async () => {
@@ -182,14 +169,13 @@ describe('runFullTest', () => {
     await expect(runFullTest(makeCallbacks(), [fail])).rejects.toThrow()
   })
 
-  it('global regions are marked unavailable when runTest and HTTP fallback both fail', async () => {
+  it('global regions are marked unavailable when HTTP probe fails', async () => {
     const nearestProvider = makeNearestProvider(async (cb) => {
       cb.onServerChosen?.('nearest-host')
       cb.onDownloadComplete?.()
       return nearestResult
     })
-    mockRunTest.mockRejectedValue(new Error('server down'))
-    // fetch is already stubbed to reject globally via beforeEach
+    // fetch is already stubbed to reject globally
 
     const callbacks = makeCallbacks()
     await runFullTest(callbacks, [nearestProvider])
@@ -197,5 +183,25 @@ describe('runFullTest', () => {
     const regions = callbacks.onRegionComplete.mock.calls.map((c: unknown[]) => c[0] as { error: string | null })
     expect(regions.every(r => r.error === 'unavailable')).toBe(true)
     expect(regions).toHaveLength(5)
+  })
+
+  it('global regions show latency and nearest-server speed when HTTP probe succeeds', async () => {
+    const nearestProvider = makeNearestProvider(async (cb) => {
+      cb.onServerChosen?.('nearest-host')
+      cb.onDownloadComplete?.()
+      return nearestResult
+    })
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 200 })))
+
+    const callbacks = makeCallbacks()
+    await runFullTest(callbacks, [nearestProvider])
+
+    type R = { error: string | null; latencyMs: number | null; downloadMbps: number | null; uploadMbps: number | null }
+    const regions = callbacks.onRegionComplete.mock.calls.map((c: unknown[]) => c[0] as R)
+    expect(regions).toHaveLength(5)
+    expect(regions.every(r => r.error === null)).toBe(true)
+    expect(regions.every(r => r.latencyMs !== null)).toBe(true)
+    expect(regions.every(r => r.downloadMbps === nearestResult.downloadMbps)).toBe(true)
+    expect(regions.every(r => r.uploadMbps === nearestResult.uploadMbps)).toBe(true)
   })
 })
