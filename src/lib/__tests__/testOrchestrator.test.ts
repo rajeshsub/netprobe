@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 const { mockRunTestDirect, mockMeasureBufferBloat } = vi.hoisted(() => ({
   mockRunTestDirect: vi.fn(),
@@ -43,7 +43,7 @@ vi.mock('../regionSelector', () => ({
   selectServers: vi.fn(),
 }))
 
-import { runFullTest } from '../testOrchestrator'
+import { runFullTest, measureRegionLatencyHTTP } from '../testOrchestrator'
 import type { ProviderFn, ProviderCallbacks } from '../speedProviders'
 
 const bloatResult = { baseline: 12, underLoad: 40, delta: 28, grade: 'B' as const, samples: [12, 40, 38] }
@@ -78,8 +78,14 @@ function makeCallbacks() {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  // Stub fetch so the HTTP latency fallback fails fast without making real network requests
+  vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('fetch stubbed in tests')))
   mockMeasureBufferBloat.mockResolvedValue(bloatResult)
   mockRunTestDirect.mockResolvedValue(regionResult)
+})
+
+afterEach(() => {
+  vi.unstubAllGlobals()
 })
 
 describe('runFullTest', () => {
@@ -175,13 +181,14 @@ describe('runFullTest', () => {
     await expect(runFullTest(makeCallbacks(), [fail])).rejects.toThrow()
   })
 
-  it('global regions are marked unavailable when runTestDirect fails', async () => {
+  it('global regions are marked unavailable when runTestDirect and HTTP fallback both fail', async () => {
     const nearestProvider = makeNearestProvider(async (cb) => {
       cb.onServerChosen?.('nearest-host')
       cb.onDownloadComplete?.()
       return nearestResult
     })
     mockRunTestDirect.mockRejectedValue(new Error('server down'))
+    // fetch is already stubbed to reject globally via beforeEach
 
     const callbacks = makeCallbacks()
     await runFullTest(callbacks, [nearestProvider])
