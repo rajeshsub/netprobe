@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
-const { mockRunTestDirect, mockMeasureBufferBloat } = vi.hoisted(() => ({
+const { mockRunTest, mockRunTestDirect, mockMeasureBufferBloat } = vi.hoisted(() => ({
+  mockRunTest: vi.fn(),
   mockRunTestDirect: vi.fn(),
   mockMeasureBufferBloat: vi.fn(),
 }))
@@ -22,7 +23,7 @@ vi.mock('../../config', () => ({
 }))
 
 vi.mock('../ndt7Engine', () => ({
-  runTest: vi.fn(),
+  runTest: mockRunTest,
   runTestDirect: mockRunTestDirect,
   buildDirectUrlMap: vi.fn((h: string) => ({ '///ndt/v7/download': `wss://${h}/ndt/v7/download` })),
 }))
@@ -43,7 +44,7 @@ vi.mock('../regionSelector', () => ({
   selectServers: vi.fn(),
 }))
 
-import { runFullTest, measureRegionLatencyHTTP } from '../testOrchestrator'
+import { runFullTest } from '../testOrchestrator'
 import type { ProviderFn, ProviderCallbacks } from '../speedProviders'
 
 const bloatResult = { baseline: 12, underLoad: 40, delta: 28, grade: 'B' as const, samples: [12, 40, 38] }
@@ -78,10 +79,10 @@ function makeCallbacks() {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  // Stub fetch so the HTTP latency fallback fails fast without making real network requests
+  // Stub fetch so the HTTP latency fallback fails fast without real network requests
   vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('fetch stubbed in tests')))
   mockMeasureBufferBloat.mockResolvedValue(bloatResult)
-  mockRunTestDirect.mockResolvedValue(regionResult)
+  mockRunTest.mockResolvedValue(regionResult)
 })
 
 afterEach(() => {
@@ -97,14 +98,14 @@ describe('runFullTest', () => {
       cb.onDownloadComplete?.()
       return nearestResult
     })
-    mockRunTestDirect.mockImplementation(async () => { order.push('region'); return regionResult })
+    mockRunTest.mockImplementation(async () => { order.push('region'); return regionResult })
 
     await runFullTest(makeCallbacks(), [nearestProvider])
     expect(order[0]).toBe('nearest')
     expect(order.slice(1).every(o => o === 'region')).toBe(true)
   })
 
-  it('runs all 5 global region tests via runTestDirect', async () => {
+  it('runs all 5 global region tests via runTest', async () => {
     const nearestProvider = makeNearestProvider(async (cb) => {
       cb.onServerChosen?.('nearest-host')
       cb.onDownloadComplete?.()
@@ -112,7 +113,7 @@ describe('runFullTest', () => {
     })
 
     await runFullTest(makeCallbacks(), [nearestProvider])
-    expect(mockRunTestDirect).toHaveBeenCalledTimes(5)
+    expect(mockRunTest).toHaveBeenCalledTimes(5)
   })
 
   it('a failed region does not abort others', async () => {
@@ -121,7 +122,7 @@ describe('runFullTest', () => {
       cb.onDownloadComplete?.()
       return nearestResult
     })
-    mockRunTestDirect
+    mockRunTest
       .mockRejectedValueOnce(new Error('region 1 failed'))
       .mockResolvedValue(regionResult)
 
@@ -181,13 +182,13 @@ describe('runFullTest', () => {
     await expect(runFullTest(makeCallbacks(), [fail])).rejects.toThrow()
   })
 
-  it('global regions are marked unavailable when runTestDirect and HTTP fallback both fail', async () => {
+  it('global regions are marked unavailable when runTest and HTTP fallback both fail', async () => {
     const nearestProvider = makeNearestProvider(async (cb) => {
       cb.onServerChosen?.('nearest-host')
       cb.onDownloadComplete?.()
       return nearestResult
     })
-    mockRunTestDirect.mockRejectedValue(new Error('server down'))
+    mockRunTest.mockRejectedValue(new Error('server down'))
     // fetch is already stubbed to reject globally via beforeEach
 
     const callbacks = makeCallbacks()
