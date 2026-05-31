@@ -49,8 +49,8 @@ function rttFromServerMeasurement(m: Record<string, unknown>): number {
 // Used by ndt7DirectProvider and global region tests to avoid 429 rate-limit errors.
 export function buildDirectUrlMap(hostname: string): Record<string, string> {
   return {
-    'wss:///ndt/v7/download': `wss://${hostname}/ndt/v7/download`,
-    'wss:///ndt/v7/upload': `wss://${hostname}/ndt/v7/upload`,
+    '///ndt/v7/download': `wss://${hostname}/ndt/v7/download`,
+    '///ndt/v7/upload': `wss://${hostname}/ndt/v7/upload`,
   }
 }
 

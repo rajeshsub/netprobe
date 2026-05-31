@@ -24,7 +24,7 @@ vi.mock('../../config', () => ({
 vi.mock('../ndt7Engine', () => ({
   runTest: vi.fn(),
   runTestDirect: mockRunTestDirect,
-  buildDirectUrlMap: vi.fn((h: string) => ({ 'wss:///ndt/v7/download': `wss://${h}/ndt/v7/download` })),
+  buildDirectUrlMap: vi.fn((h: string) => ({ '///ndt/v7/download': `wss://${h}/ndt/v7/download` })),
 }))
 vi.mock('../bufferBloatDetector', () => ({
   measureBufferBloat: mockMeasureBufferBloat,
