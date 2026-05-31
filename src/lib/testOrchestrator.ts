@@ -56,6 +56,11 @@ export async function runFullTest(
   let downloadResolve: (() => void) | null = null
   const downloadDone = new Promise<void>(resolve => { downloadResolve = resolve })
 
+  // Track live samples so regional results always have speed values even if
+  // the ProviderResult fields are 0 due to an NDT7 edge case.
+  let lastDownloadMbps = 0
+  let lastUploadMbps = 0
+
   const nearestResult = await runWithFallback(providers, {
     onServerChosen: (hostname) => {
       pingUrl = buildPingUrl(hostname)
@@ -68,13 +73,16 @@ export async function runFullTest(
         (ms) => callbacks.onLatencySample(ms)
       ).then(result => { bufferBloat = result })
     },
-    onDownloadSample: (s) => callbacks.onDownloadSample(s),
+    onDownloadSample: (s) => { lastDownloadMbps = s.mbps; callbacks.onDownloadSample(s) },
     onDownloadComplete: () => {
       downloadResolve?.()
       callbacks.onPhase('nearest_upload')
     },
-    onUploadSample: (s) => callbacks.onUploadSample(s),
+    onUploadSample: (s) => { lastUploadMbps = s.mbps; callbacks.onUploadSample(s) },
   })
+
+  const regionDownloadMbps = nearestResult.downloadMbps || lastDownloadMbps || null
+  const regionUploadMbps = nearestResult.uploadMbps || lastUploadMbps || null
 
   callbacks.onPhase('global')
 
@@ -85,7 +93,7 @@ export async function runFullTest(
       let r: RegionResult
       try {
         const latencyMs = await measureRegionLatencyHTTP(region.hostname)
-        r = { name: region.name, downloadMbps: nearestResult.downloadMbps, uploadMbps: nearestResult.uploadMbps, latencyMs, error: null }
+        r = { name: region.name, downloadMbps: regionDownloadMbps, uploadMbps: regionUploadMbps, latencyMs, error: null }
       } catch {
         r = { name: region.name, downloadMbps: null, uploadMbps: null, latencyMs: null, error: 'unavailable' }
       }
