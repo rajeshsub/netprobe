@@ -185,7 +185,7 @@ describe('runFullTest', () => {
     expect(regions).toHaveLength(5)
   })
 
-  it('global regions show latency and nearest-server speed when HTTP probe succeeds', async () => {
+  it('global regions show latency-only when HTTP probe succeeds', async () => {
     const nearestProvider = makeNearestProvider(async (cb) => {
       cb.onServerChosen?.('nearest-host')
       cb.onDownloadComplete?.()
@@ -201,7 +201,7 @@ describe('runFullTest', () => {
     expect(regions).toHaveLength(5)
     expect(regions.every(r => r.error === null)).toBe(true)
     expect(regions.every(r => r.latencyMs !== null)).toBe(true)
-    expect(regions.every(r => r.downloadMbps === nearestResult.downloadMbps)).toBe(true)
-    expect(regions.every(r => r.uploadMbps === nearestResult.uploadMbps)).toBe(true)
+    expect(regions.every(r => r.downloadMbps === null)).toBe(true)
+    expect(regions.every(r => r.uploadMbps === null)).toBe(true)
   })
 })

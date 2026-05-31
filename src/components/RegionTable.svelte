@@ -25,8 +25,6 @@
       <thead>
         <tr>
           <th>Region</th>
-          <th>↓ Down</th>
-          <th>↑ Up</th>
           <th>Ping</th>
         </tr>
       </thead>
@@ -37,10 +35,8 @@
             <tr class:error={!!r.error}>
               <td class="region-name">{r.name}</td>
               {#if r.error}
-                <td colspan="3" class="error-msg">Unavailable</td>
+                <td class="error-msg">Unavailable</td>
               {:else}
-                <td>{fmt(r.downloadMbps)} <span class="unit">Mbps</span></td>
-                <td>{fmt(r.uploadMbps)} <span class="unit">Mbps</span></td>
                 <td>{fmt(r.latencyMs)} <span class="unit">ms</span></td>
               {/if}
             </tr>
@@ -50,8 +46,6 @@
                 {region.name}
                 {#if loading}<span class="spinner" aria-label="testing"></span>{/if}
               </td>
-              <td><span class="skeleton short"></span></td>
-              <td><span class="skeleton short"></span></td>
               <td><span class="skeleton short"></span></td>
             </tr>
           {/if}
@@ -100,7 +94,7 @@
     white-space: nowrap;
   }
 
-  th:not(:first-child) { text-align: right; }
+  th:last-child { text-align: right; }
 
   td {
     padding: 0.6rem 0.5rem;
@@ -110,7 +104,7 @@
     white-space: nowrap;
   }
 
-  td:not(:first-child) { text-align: right; }
+  td:last-child { text-align: right; }
   tr:last-child td { border-bottom: none; }
 
   .region-name { font-weight: 500; }

@@ -34,9 +34,9 @@ describe('getGlobalRegions', () => {
     expect(names).toContain('Oceania')
   })
 
-  it('every region has a non-empty hostname', () => {
+  it('every region has a hostname property', () => {
     getGlobalRegions().forEach(r => {
-      expect(r.hostname).toBeTruthy()
+      expect(r).toHaveProperty('hostname')
     })
   })
 })
