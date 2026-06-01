@@ -141,7 +141,7 @@
     <div class="container">
       <div class="brand">
         <h1 class="wordmark">Netprobe</h1>
-        <span class="tagline">Network quality measured the way it should be.</span>
+        <span class="tagline">Because "speed" doesn't explain the lag.</span>
       </div>
     </div>
   </header>

@@ -1,6 +1,6 @@
 # Netprobe
 
-Network quality measured the way it should be.
+Because "speed" doesn't explain the lag.
 
 Netprobe runs a comprehensive connection test in your browser — no app, no server, no account. It measures what actually matters for a real internet connection: not just raw speed, but latency, jitter, and buffer bloat.
 
