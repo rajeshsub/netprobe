@@ -18,7 +18,7 @@ Netprobe runs a comprehensive connection test in your browser — no app, no ser
 | **Upload speed** | How fast your device sends data |
 | **Latency** | Round-trip time to your nearest server |
 | **Jitter** | How consistent your latency is |
-| **Buffer bloat** | Whether your connection gets sluggish under load — the hidden quality killer |
+| **Buffer bloat** | How much does your connection struggle under load |
 
 Buffer bloat is graded A–F. An A means your latency barely changes during a download. An F means your connection is unusable for calls, gaming, or anything interactive while someone else is downloading.
 
