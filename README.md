@@ -55,18 +55,6 @@ Copy `.env.example` to `.env` before running locally. All configuration is via e
 
 ---
 
-## Deployment
-
-Pushes to `main` automatically build and deploy to GitHub Pages via GitHub Actions.
-
-Before the first deploy, one step is needed in the repository settings:
-
-1. **Settings → Pages → Source:** set to `GitHub Actions`
-
-All config values have working defaults and no GitHub Variables need to be set.
-
----
-
 ## Stack
 
 - [Svelte 5](https://svelte.dev/) + [Vite](https://vite.dev/) — compiled, no runtime framework overhead
