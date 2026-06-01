@@ -61,7 +61,6 @@
     border: 1px solid var(--border-subtle);
     border-radius: 16px;
     padding: 1.25rem;
-    overflow: hidden;
   }
 
   .section-label {

@@ -7,9 +7,12 @@
   import SpeedGauge from './components/SpeedGauge.svelte'
   import BufferBloatPanel from './components/BufferBloatPanel.svelte'
   import RegionTable from './components/RegionTable.svelte'
+  import ConnectionHealthPanel from './components/ConnectionHealthPanel.svelte'
+  import TraceBorder from './components/TraceBorder.svelte'
 
   let copied = $state(false)
   let isShared = $state(false)
+  let traceEpoch = $state(0)
 
   onMount(() => {
     const hash = window.location.hash
@@ -40,6 +43,7 @@
     { id: 'buffer_bloat', label: 'Buffer bloat' },
     { id: 'upload',       label: 'Upload test' },
     { id: 'global',       label: 'Global regions' },
+    { id: 'health',       label: 'Connection health' },
   ] as const
 
   type StepId = typeof STEPS[number]['id']
@@ -47,11 +51,12 @@
   function isStepDone(id: StepId): boolean {
     const ph = testState.phase
     switch (id) {
-      case 'server':       return ['nearest_download', 'nearest_upload', 'global', 'done'].includes(ph)
-      case 'download':     return ['nearest_upload', 'global', 'done'].includes(ph)
-      case 'buffer_bloat': return ['nearest_upload', 'global', 'done'].includes(ph)
-      case 'upload':       return ['global', 'done'].includes(ph)
-      case 'global':       return ph === 'done'
+      case 'server':       return ['nearest_download', 'nearest_upload', 'global', 'health', 'done'].includes(ph)
+      case 'download':     return ['nearest_upload', 'global', 'health', 'done'].includes(ph)
+      case 'buffer_bloat': return testState.bufferBloatReady
+      case 'upload':       return ['global', 'health', 'done'].includes(ph)
+      case 'global':       return ['health', 'done'].includes(ph)
+      case 'health':       return ph === 'done'
     }
   }
 
@@ -60,9 +65,10 @@
     switch (id) {
       case 'server':       return ph === 'locating'
       case 'download':     return ph === 'nearest_download'
-      case 'buffer_bloat': return ph === 'nearest_download'
+      case 'buffer_bloat': return (ph === 'nearest_download' || ph === 'nearest_upload') && !testState.bufferBloatReady
       case 'upload':       return ph === 'nearest_upload'
       case 'global':       return ph === 'global'
+      case 'health':       return ph === 'health'
     }
   }
 
@@ -81,16 +87,32 @@
   async function startTest() {
     testState.reset()
     testState.phase = 'locating'
+    traceEpoch = 0
     isShared = false
 
     try {
       const results = await runFullTest({
-        onPhase: (p) => { testState.phase = p },
+        onPhase: (p) => {
+          if (p === 'nearest_download' && traceEpoch === 0) traceEpoch = Date.now()
+          testState.phase = p
+        },
         onDownloadSample: (s) => { testState.downloadMbps = s.mbps },
         onUploadSample: (s) => { testState.uploadMbps = s.mbps },
         onLatencySample: (ms) => { testState.addLatencySample(ms) },
         onRegionComplete: (r) => { testState.addRegion(r) },
         onNearestServer: (h) => { testState.nearestRegion = h },
+        onNearestComplete: (lat, jit) => {
+          testState.latencyMs = lat
+          testState.jitterMs = jit
+        },
+        onBufferBloatComplete: (r) => {
+          testState.bufferBloatGrade = r.grade
+          testState.bufferBloatDelta = r.delta
+          testState.bufferBloatUploadGrade = r.uploadGrade ?? null
+          testState.bufferBloatUploadDelta = r.uploadDelta ?? null
+          testState.bufferBloatReady = true
+        },
+        onHealthComplete: (h) => { testState.healthChecks = h },
         onError: (msg) => { testState.error = msg },
       })
 
@@ -147,7 +169,7 @@
             {#if isDone && testProducedData}
               <span class="progress-label done-label">
                 <span class="done-tick" aria-hidden="true">✓</span>
-                All 5 steps complete
+                All {STEPS.length} steps complete
               </span>
             {:else if isDone && !testProducedData}
               <span class="progress-label warn-label">
@@ -184,12 +206,14 @@
                     {testState.nearestRegion.split('.')[0]}
                   {:else if step.id === 'download' && testState.downloadMbps > 0 && (done || active)}
                     {testState.downloadMbps.toFixed(0)} Mbps
-                  {:else if step.id === 'buffer_bloat' && done}
+                  {:else if step.id === 'buffer_bloat' && testState.bufferBloatReady}
                     Grade {testState.bufferBloatGrade}
                   {:else if step.id === 'upload' && testState.uploadMbps > 0 && (done || active)}
                     {testState.uploadMbps.toFixed(0)} Mbps
                   {:else if step.id === 'global' && testState.regions.length > 0}
                     {testState.regions.length} / {TOTAL_REGIONS}
+                  {:else if step.id === 'health' && isDone}
+                    7 checks
                   {/if}
                 </span>
               </li>
@@ -199,49 +223,71 @@
       {/if}
 
       <div class="metrics-grid">
-        <SpeedGauge
-          value={testState.downloadMbps}
-          max={500}
-          label="Download"
-          unit="Mbps"
-          active={testState.phase === 'nearest_download'}
-        />
-        <SpeedGauge
-          value={testState.uploadMbps}
-          max={250}
-          label="Upload"
-          unit="Mbps"
-          active={testState.phase === 'nearest_upload'}
-        />
-        <SpeedGauge
-          value={testState.latencyMs}
-          max={150}
-          label="Latency"
-          unit="ms"
-        />
-        <SpeedGauge
-          value={testState.jitterMs}
-          max={50}
-          label="Jitter"
-          unit="ms"
-        />
+        <TraceBorder active={testState.phase === 'nearest_download'} syncEpoch={traceEpoch}>
+          <SpeedGauge
+            value={testState.downloadMbps}
+            max={500}
+            label="Download"
+            unit="Mbps"
+            active={testState.phase === 'nearest_download'}
+          />
+        </TraceBorder>
+        <TraceBorder active={testState.phase === 'nearest_upload'} syncEpoch={traceEpoch}>
+          <SpeedGauge
+            value={testState.uploadMbps}
+            max={250}
+            label="Upload"
+            unit="Mbps"
+            active={testState.phase === 'nearest_upload'}
+          />
+        </TraceBorder>
+        <TraceBorder active={testState.phase === 'nearest_download' || testState.phase === 'nearest_upload' || (testState.latencyMs === 0 && isRunning)} syncEpoch={traceEpoch}>
+          <SpeedGauge
+            value={testState.latencyMs}
+            max={150}
+            label="Latency"
+            unit="ms"
+            active={testState.phase === 'nearest_download' || testState.phase === 'nearest_upload' || (testState.latencyMs === 0 && isRunning)}
+          />
+        </TraceBorder>
+        <TraceBorder active={testState.phase === 'nearest_download' || testState.phase === 'nearest_upload' || (testState.jitterMs === 0 && isRunning)} syncEpoch={traceEpoch}>
+          <SpeedGauge
+            value={testState.jitterMs}
+            max={50}
+            label="Jitter"
+            unit="ms"
+            active={testState.phase === 'nearest_download' || testState.phase === 'nearest_upload' || (testState.jitterMs === 0 && isRunning)}
+          />
+        </TraceBorder>
+        <TraceBorder active={testState.phase === 'nearest_download' || testState.phase === 'nearest_upload'} syncEpoch={traceEpoch}>
+          <BufferBloatPanel
+            grade={testState.bufferBloatGrade}
+            delta={testState.bufferBloatDelta}
+            uploadGrade={testState.bufferBloatUploadGrade}
+            uploadDelta={testState.bufferBloatUploadDelta}
+            samples={testState.bufferBloatSamples}
+            active={testState.phase === 'nearest_download' || testState.phase === 'nearest_upload'}
+            done={testState.bufferBloatReady}
+          />
+        </TraceBorder>
       </div>
 
-      {#if testState.phase !== 'idle' && testState.phase !== 'locating' && testState.phase !== 'error'}
-        <BufferBloatPanel
-          grade={testState.bufferBloatGrade}
-          delta={testState.bufferBloatDelta}
-          samples={testState.bufferBloatSamples}
-          active={testState.phase === 'nearest_download'}
-          done={isDone}
-        />
+      {#if testState.phase === 'global' || testState.phase === 'health' || testState.phase === 'done' || testState.regions.length > 0}
+        <TraceBorder active={testState.phase === 'global'} syncEpoch={traceEpoch}>
+          <RegionTable
+            regions={testState.regions}
+            loading={testState.phase === 'global'}
+          />
+        </TraceBorder>
       {/if}
 
-      {#if testState.phase === 'global' || testState.phase === 'done' || testState.regions.length > 0}
-        <RegionTable
-          regions={testState.regions}
-          loading={testState.phase === 'global'}
-        />
+      {#if testState.phase === 'health' || testState.phase === 'done' || testState.healthChecks !== null}
+        <TraceBorder active={testState.phase === 'health'} syncEpoch={traceEpoch}>
+          <ConnectionHealthPanel
+            health={testState.healthChecks}
+            loading={testState.phase === 'health'}
+          />
+        </TraceBorder>
       {/if}
 
       {#if testState.phase === 'error'}
@@ -524,13 +570,18 @@
 
   .metrics-grid {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(5, 1fr);
     gap: 0.875rem;
+    align-items: stretch;
   }
 
-  @media (max-width: 520px) {
+  @media (max-width: 640px) {
     .metrics-grid {
       grid-template-columns: repeat(2, 1fr);
+    }
+    /* Buffer bloat (TraceBorder wrapper) spans full width below the 2-col gauge pairs */
+    .metrics-grid > :global(:last-child) {
+      grid-column: 1 / -1;
     }
   }
 

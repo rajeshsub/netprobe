@@ -6,6 +6,9 @@ export interface BufferBloatResult {
   delta: number
   grade: BufferBloatGrade
   samples: number[]
+  // Upload phase results — only present when buffer bloat is measured during upload too.
+  uploadGrade?: BufferBloatGrade
+  uploadDelta?: number
 }
 
 export function gradeFromDelta(delta: number): BufferBloatGrade {
@@ -24,12 +27,10 @@ function percentile(arr: number[], p: number): number {
 export function computeBufferBloat(
   baselineSamples: number[],
   loadSamples: number[]
-): BufferBloatResult {
+): Omit<BufferBloatResult, 'uploadGrade' | 'uploadDelta'> {
   if (!baselineSamples.length || !loadSamples.length) {
     return { baseline: 0, underLoad: 0, delta: 0, grade: 'A', samples: loadSamples }
   }
-  // Median baseline (robust to first-connection overhead)
-  // 90th-percentile under load (captures spikes, not averaged away)
   const baseline = percentile(baselineSamples, 0.5)
   const underLoad = percentile(loadSamples, 0.9)
   const delta = Math.max(0, underLoad - baseline)
@@ -47,10 +48,15 @@ function ping(url: string): Promise<number> {
   })
 }
 
+// Measures buffer bloat during download, and optionally upload.
+// Samples are tracked separately per phase so each direction gets its own
+// grade — combining them inflates the grade because upload saturates the
+// outgoing path, spiking any outgoing ping by 200ms+ even on healthy connections.
 export async function measureBufferBloat(
   pingUrl: string,
   runDownload: () => Promise<void>,
-  onSample: (ms: number) => void
+  onSample: (ms: number) => void,
+  runUpload?: () => Promise<void>
 ): Promise<BufferBloatResult> {
   const baselineSamples: number[] = []
   for (let i = 0; i < 5; i++) {
@@ -58,14 +64,17 @@ export async function measureBufferBloat(
     await new Promise<void>(r => setTimeout(r, 100))
   }
 
-  const loadSamples: number[] = []
+  const downloadSamples: number[] = []
+  const uploadSamples: number[] = []
+  let inUpload = false
   let active = true
 
   const pingLoop = async () => {
     while (active) {
       try {
         const ms = await ping(pingUrl)
-        loadSamples.push(ms)
+        if (inUpload) uploadSamples.push(ms)
+        else downloadSamples.push(ms)
         onSample(ms)
       } catch { /* skip */ }
       await new Promise<void>(r => setTimeout(r, 200))
@@ -74,7 +83,21 @@ export async function measureBufferBloat(
 
   void pingLoop()
   await runDownload()
+
+  if (runUpload) {
+    inUpload = true
+    await runUpload()
+  }
+
   active = false
 
-  return computeBufferBloat(baselineSamples, loadSamples)
+  const dl = computeBufferBloat(baselineSamples, downloadSamples)
+  const ul = runUpload ? computeBufferBloat(baselineSamples, uploadSamples) : undefined
+
+  return {
+    ...dl,
+    samples: [...downloadSamples, ...uploadSamples],
+    uploadGrade: ul?.grade,
+    uploadDelta: ul?.delta,
+  }
 }

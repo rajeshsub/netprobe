@@ -8,6 +8,24 @@ export interface RegionResult {
   error: string | null
 }
 
+export interface CdnLatency {
+  name: string
+  latencyMs: number
+}
+
+export interface HealthCheckResults {
+  isp: string | null
+  asn: string | null
+  city: string | null
+  connectionType: string | null
+  effectiveConnectionType: string | null
+  webrtcLeakDetected: boolean | null
+  webrtcIps: string[]
+  packetLossPercent: number | null
+  dnsTimeMs: number | null
+  cdnLatencies: CdnLatency[] | null
+}
+
 export interface TestResults {
   downloadMbps: number
   uploadMbps: number
@@ -18,10 +36,15 @@ export interface TestResults {
   nearestRegion: string
   regions: RegionResult[]
   timestamp: number
+  healthChecks: HealthCheckResults | null
 }
 
 function r(n: number | null, decimals = 1): string {
   return n === null ? '' : n.toFixed(decimals)
+}
+
+function truncate(s: string, max: number): string {
+  return s.length <= max ? s : s.slice(0, max)
 }
 
 export function encode(results: TestResults): string {
@@ -42,6 +65,21 @@ export function encode(results: TestResults): string {
     ts: String(results.timestamp),
     r: regionStr,
   })
+
+  const h = results.healthChecks
+  if (h) {
+    if (h.isp)                              params.set('isp', truncate(h.isp, 32))
+    if (h.asn)                              params.set('asn', h.asn)
+    if (h.city)                             params.set('city', h.city)
+    if (h.connectionType)                   params.set('ct', h.connectionType)
+    if (h.effectiveConnectionType)          params.set('ect', h.effectiveConnectionType)
+    if (h.webrtcLeakDetected !== null)      params.set('wrtc', h.webrtcLeakDetected ? '1' : '0')
+    if (h.packetLossPercent !== null)       params.set('pl', r(h.packetLossPercent))
+    if (h.dnsTimeMs !== null)               params.set('dns', r(h.dnsTimeMs, 0))
+    if (h.cdnLatencies && h.cdnLatencies.length > 0) {
+      params.set('cdn', h.cdnLatencies.map(c => `${encodeURIComponent(c.name)}:${Math.round(c.latencyMs)}`).join(','))
+    }
+  }
 
   return params.toString()
 }
@@ -79,7 +117,36 @@ export function decode(hash: string): TestResults | null {
       }
     }) : []
 
-    return { downloadMbps: dl, uploadMbps: ul, latencyMs: lat, jitterMs: j, bufferBloatDelta: bb, bufferBloatGrade: bbg, nearestRegion: nr, regions, timestamp: ts }
+    // Health checks are optional — absent in v1 links generated before this feature.
+    let healthChecks: HealthCheckResults | null = null
+    if (params.has('isp') || params.has('pl') || params.has('wrtc')) {
+      const cdnStr = params.get('cdn') ?? ''
+      const cdnLatencies: CdnLatency[] = cdnStr
+        ? cdnStr.split(',').map(seg => {
+            const [name, ms] = seg.split(':')
+            return { name: decodeURIComponent(name), latencyMs: parseFloat(ms) || 0 }
+          })
+        : []
+
+      const pl = params.get('pl')
+      const dns = params.get('dns')
+      const wrtc = params.get('wrtc')
+
+      healthChecks = {
+        isp: params.get('isp'),
+        asn: params.get('asn'),
+        city: params.get('city'),
+        connectionType: params.get('ct'),
+        effectiveConnectionType: params.get('ect'),
+        webrtcLeakDetected: wrtc !== null ? wrtc === '1' : null,
+        webrtcIps: [],
+        packetLossPercent: pl !== null ? parseFloat(pl) : null,
+        dnsTimeMs: dns !== null ? parseFloat(dns) : null,
+        cdnLatencies: cdnLatencies.length > 0 ? cdnLatencies : null,
+      }
+    }
+
+    return { downloadMbps: dl, uploadMbps: ul, latencyMs: lat, jitterMs: j, bufferBloatDelta: bb, bufferBloatGrade: bbg, nearestRegion: nr, regions, timestamp: ts, healthChecks }
   } catch {
     return null
   }

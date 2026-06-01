@@ -1,5 +1,5 @@
 import type { Phase } from '../lib/testOrchestrator'
-import type { RegionResult, TestResults } from '../lib/urlSerializer'
+import type { RegionResult, TestResults, HealthCheckResults } from '../lib/urlSerializer'
 import type { BufferBloatGrade } from '../lib/bufferBloatDetector'
 
 class TestState {
@@ -10,9 +10,13 @@ class TestState {
   jitterMs = $state(0)
   bufferBloatDelta = $state(0)
   bufferBloatGrade = $state<BufferBloatGrade>('A')
+  bufferBloatUploadGrade = $state<BufferBloatGrade | null>(null)
+  bufferBloatUploadDelta = $state<number | null>(null)
   bufferBloatSamples = $state<number[]>([])
   regions = $state<RegionResult[]>([])
   nearestRegion = $state('')
+  healthChecks = $state<HealthCheckResults | null>(null)
+  bufferBloatReady = $state(false)
   error = $state<string | null>(null)
 
   reset() {
@@ -23,9 +27,13 @@ class TestState {
     this.jitterMs = 0
     this.bufferBloatDelta = 0
     this.bufferBloatGrade = 'A'
+    this.bufferBloatUploadGrade = null
+    this.bufferBloatUploadDelta = null
     this.bufferBloatSamples = []
     this.regions = []
     this.nearestRegion = ''
+    this.healthChecks = null
+    this.bufferBloatReady = false
     this.error = null
   }
 
@@ -46,6 +54,7 @@ class TestState {
     this.bufferBloatGrade = r.bufferBloatGrade
     this.regions = r.regions
     this.nearestRegion = r.nearestRegion
+    this.healthChecks = r.healthChecks
     this.phase = 'done'
   }
 }

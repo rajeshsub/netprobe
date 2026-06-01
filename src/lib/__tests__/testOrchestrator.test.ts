@@ -1,8 +1,26 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
-const { mockMeasureBufferBloat } = vi.hoisted(() => ({
-  mockMeasureBufferBloat: vi.fn(),
-}))
+const { mockMeasureBufferBloat, mockRunEarlyHealthChecks, mockRunLateHealthChecks, mockCombineHealthResults } = vi.hoisted(() => {
+  const healthResult = {
+    isp: 'Test ISP', asn: 'AS1234', city: 'Test City',
+    connectionType: 'wifi', effectiveConnectionType: '4g',
+    webrtcLeakDetected: false, webrtcIps: [],
+    packetLossPercent: 0, dnsTimeMs: 20,
+    cdnLatencies: [{ name: 'Cloudflare', latencyMs: 12 }],
+  }
+  const earlyResult = {
+    ispInfo: { isp: 'Test ISP', asn: 'AS1234', city: 'Test City', ip: '1.2.3.4' },
+    webrtcLeakDetected: false, webrtcIps: [],
+    connectionType: 'wifi', effectiveConnectionType: '4g',
+  }
+  const lateResult = { packetLossPercent: 0, cdnLatencies: [{ name: 'Cloudflare', latencyMs: 12 }], dnsTimeMs: 20 }
+  return {
+    mockMeasureBufferBloat: vi.fn(),
+    mockRunEarlyHealthChecks: vi.fn().mockResolvedValue(earlyResult),
+    mockRunLateHealthChecks: vi.fn().mockResolvedValue(lateResult),
+    mockCombineHealthResults: vi.fn().mockReturnValue(healthResult),
+  }
+})
 
 vi.mock('../../config', () => ({
   config: {
@@ -30,6 +48,12 @@ vi.mock('../bufferBloatDetector', () => ({
   computeBufferBloat: vi.fn(),
   gradeFromDelta: vi.fn(),
 }))
+vi.mock('../healthChecks/index', () => ({
+  runEarlyHealthChecks: mockRunEarlyHealthChecks,
+  runLateHealthChecks: mockRunLateHealthChecks,
+  combineHealthResults: mockCombineHealthResults,
+}))
+
 vi.mock('../regionSelector', () => ({
   buildPingUrl: (h: string) => `https://${h}/favicon.ico`,
   getGlobalRegions: () => [
@@ -66,6 +90,7 @@ function makeCallbacks() {
     onLatencySample: vi.fn(),
     onRegionComplete: vi.fn(),
     onNearestServer: vi.fn(),
+    onHealthComplete: vi.fn(),
     onError: vi.fn(),
   }
 }

@@ -5,12 +5,16 @@
   let {
     grade,
     delta,
+    uploadGrade = null,
+    uploadDelta = null,
     samples,
     active = false,
     done = false,
   }: {
     grade: BufferBloatGrade
     delta: number
+    uploadGrade?: BufferBloatGrade | null
+    uploadDelta?: number | null
     samples: number[]
     active?: boolean
     done?: boolean
@@ -46,6 +50,7 @@
   const hasData = $derived(samples.length > 0)
   const measured = $derived(done && samples.length > 0)
   const unmeasurable = $derived(done && samples.length === 0)
+  const started = $derived(active || hasData || done)
 </script>
 
 <div class="panel" class:active>
@@ -54,13 +59,20 @@
       <span class="section-label">Buffer Bloat</span>
       {#if measured}
         <span class="grade" style="color: {gradeColor[grade]}">{grade}</span>
-        <span class="delta">+{Math.round(delta)}ms under load</span>
+        <span class="delta">↓ +{Math.round(delta)}ms</span>
+        {#if uploadGrade !== null && uploadDelta !== null}
+          <span class="delta upload-delta" style="color: {gradeColor[uploadGrade]}">
+            ↑ +{Math.round(uploadDelta)}ms ({uploadGrade})
+          </span>
+        {/if}
       {:else if unmeasurable}
         <span class="grade evaluating">?</span>
         <span class="delta">Unable to measure</span>
-      {:else}
+      {:else if started}
         <span class="grade evaluating">—</span>
         <span class="delta">Evaluating...</span>
+      {:else}
+        <span class="grade evaluating quiet">—</span>
       {/if}
 
       <!-- Grade scale chips -->
@@ -113,8 +125,11 @@
     background: var(--surface);
     border: 1px solid var(--border-subtle);
     border-radius: 16px;
-    padding: 1.25rem 1.5rem;
+    padding: 0.875rem 0.875rem 0.75rem;
     transition: border-color 0.25s, box-shadow 0.25s;
+    container-type: inline-size;
+    display: flex;
+    flex-direction: column;
   }
 
   .panel.active {
@@ -123,6 +138,7 @@
   }
 
   .top {
+    flex: 1;
     display: flex;
     gap: 1.5rem;
     align-items: center;
@@ -132,9 +148,10 @@
     display: flex;
     flex-direction: column;
     align-items: center;
+    justify-content: center;
     gap: 0.2rem;
     flex-shrink: 0;
-    min-width: 72px;
+    min-width: 58px;
   }
 
   .graph-col {
@@ -151,7 +168,7 @@
   }
 
   .grade {
-    font-size: 3.75rem;
+    font-size: clamp(2.5rem, 8cqi, 3.75rem);
     font-weight: 800;
     line-height: 1;
     letter-spacing: -0.04em;
@@ -162,12 +179,20 @@
     opacity: 0.4;
   }
 
+  .grade.quiet {
+    opacity: 0.15;
+  }
+
   .delta {
     font-size: 0.72rem;
     color: var(--subtext);
     font-variant-numeric: tabular-nums;
     text-align: center;
     white-space: nowrap;
+  }
+
+  .upload-delta {
+    font-weight: 500;
   }
 
   .grade-scale {
@@ -272,6 +297,16 @@
     line-height: 1.4;
   }
 
+  /* Narrow container (inside metrics-grid cell at equal width with gauges) */
+  @container (max-width: 240px) {
+    .graph-col { display: none; }
+    .grade-scale { display: none; }
+    .info-box { display: none; }
+    .top { gap: 0; justify-content: center; }
+    .grade-col { flex: 1; min-width: 0; width: 100%; }
+    .section-label { align-self: flex-start; }
+  }
+
   @media (max-width: 480px) {
     .top {
       flex-direction: column;
@@ -283,10 +318,6 @@
       align-items: center;
       gap: 0.75rem;
       min-width: unset;
-    }
-
-    .grade {
-      font-size: 2.75rem;
     }
 
     .grade-scale {

@@ -13,114 +13,58 @@
     active?: boolean
   } = $props()
 
-  // Arc geometry: 270° sweep, start at bottom-left (135°), end at bottom-right (45°)
-  const CX = 50, CY = 50, R = 38
-  const START_DEG = 135
-  const SWEEP_DEG = 270
-  const PATH_LEN = (SWEEP_DEG / 360) * 2 * Math.PI * R  // ≈ 179.1
-
-  const toRad = (d: number) => d * Math.PI / 180
-  const sx = +(CX + R * Math.cos(toRad(START_DEG))).toFixed(3)
-  const sy = +(CY + R * Math.sin(toRad(START_DEG))).toFixed(3)
-  const ex = +(CX + R * Math.cos(toRad(START_DEG + SWEEP_DEG))).toFixed(3)
-  const ey = +(CY + R * Math.sin(toRad(START_DEG + SWEEP_DEG))).toFixed(3)
-
-  // The arc path (track and value share the same geometry)
-  const arcD = `M ${sx},${sy} A ${R},${R} 0 1 1 ${ex},${ey}`
-
   const fraction = $derived(Math.min(1, Math.max(0, value / max)))
-  const offset = $derived(+(PATH_LEN * (1 - fraction)).toFixed(3))
-
-  // Peak trail: ghost at the leading edge, fades after value settles
-  let peakOffset = $state(PATH_LEN)
-  let trailOpacity = $state(0)
-  let trailTimer: ReturnType<typeof setTimeout> | null = null
-
-  $effect(() => {
-    const o = offset
-    if (o < peakOffset) {
-      peakOffset = o
-      trailOpacity = 0.35
-      if (trailTimer) clearTimeout(trailTimer)
-      trailTimer = setTimeout(() => { trailOpacity = 0 }, 1200)
-    }
-  })
 
   const displayValue = $derived(
     value <= 0 ? '0' : value >= 100 ? value.toFixed(0) : value.toFixed(1)
   )
+
+  // Peak-hold trail — marker sits at the highest value seen, fades after 1.4 s hold.
+  let peakFraction = $state(0)
+  let trailOpacity = $state(0)
+  let trailTimer: ReturnType<typeof setTimeout> | null = null
+
+  $effect(() => {
+    const f = fraction
+    if (f > peakFraction) {
+      peakFraction = f
+      trailOpacity = 0.6
+      if (trailTimer) clearTimeout(trailTimer)
+      trailTimer = setTimeout(() => { trailOpacity = 0 }, 1400)
+    }
+  })
 </script>
 
 <div class="gauge" class:active>
-  <div class="gauge-body">
-    <svg viewBox="0 0 100 86" fill="none" aria-hidden="true">
-      <defs>
-        <filter id="arc-glow-{label}" x="-40%" y="-40%" width="180%" height="180%">
-          <feGaussianBlur in="SourceGraphic" stdDeviation="2.5" result="blur" />
-          <feMerge>
-            <feMergeNode in="blur" />
-            <feMergeNode in="SourceGraphic" />
-          </feMerge>
-        </filter>
-      </defs>
+  <span class="label">{label}</span>
 
-      <!-- Track -->
-      <path
-        d={arcD}
-        stroke="var(--border-subtle)"
-        stroke-width="5"
-        stroke-linecap="round"
-        stroke-dasharray={PATH_LEN}
-        stroke-dashoffset="0"
-      />
-
-      <!-- Trail (peak ghost) -->
-      {#if trailOpacity > 0}
-        <path
-          d={arcD}
-          stroke="var(--accent)"
-          stroke-width="5"
-          stroke-linecap="round"
-          stroke-dasharray={PATH_LEN}
-          stroke-dashoffset={peakOffset}
-          opacity={trailOpacity}
-          style="transition: opacity 1200ms ease-out"
-        />
-      {/if}
-
-      <!-- Value arc -->
-      <path
-        d={arcD}
-        stroke="var(--accent)"
-        stroke-width="6"
-        stroke-linecap="round"
-        stroke-dasharray={PATH_LEN}
-        stroke-dashoffset={offset}
-        filter="url(#arc-glow-{label})"
-        style="transition: stroke-dashoffset 150ms cubic-bezier(0.25, 0.46, 0.45, 0.94)"
-      />
-    </svg>
-
-    <div class="center">
-      <span class="value">{displayValue}</span>
-      <span class="unit">{unit}</span>
-    </div>
+  <div class="center">
+    <span class="value">{displayValue}</span>
+    <span class="unit">{unit}</span>
   </div>
 
-  <div class="label">{label}</div>
+  <div class="bar-wrap">
+    <div class="bar-track">
+      <div class="bar-fill" style="width: {fraction * 100}%"></div>
+      <div
+        class="bar-peak"
+        style="left: {peakFraction * 100}%; opacity: {trailOpacity}"
+      ></div>
+    </div>
+  </div>
 </div>
 
 <style>
   .gauge {
     display: flex;
     flex-direction: column;
-    align-items: center;
-    gap: 0.4rem;
-    padding: 1rem 0.75rem 0.875rem;
+    gap: 0.35rem;
+    padding: 0.875rem 0.875rem 0.75rem;
     background: var(--surface);
     border: 1px solid var(--border-subtle);
     border-radius: 16px;
     transition: border-color 0.25s, box-shadow 0.25s;
+    container-type: inline-size;
     min-width: 0;
   }
 
@@ -129,30 +73,26 @@
     box-shadow: 0 0 0 1px var(--accent), 0 0 24px var(--accent-glow);
   }
 
-  .gauge-body {
-    position: relative;
-    width: 100%;
-  }
-
-  svg {
-    width: 100%;
-    display: block;
+  .label {
+    font-size: 0.6rem;
+    font-weight: 500;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--subtext);
   }
 
   .center {
-    position: absolute;
-    top: 46%;
-    left: 50%;
-    transform: translate(-50%, -50%);
+    flex: 1;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 1px;
-    pointer-events: none;
+    justify-content: center;
+    gap: 3px;
+    padding: 0.5rem 0 0.375rem;
   }
 
   .value {
-    font-size: clamp(1.5rem, 4.5vw, 2.25rem);
+    font-size: clamp(1.5rem, 18cqi, 2.75rem);
     font-weight: 700;
     font-variant-numeric: tabular-nums;
     letter-spacing: -0.03em;
@@ -161,17 +101,43 @@
   }
 
   .unit {
-    font-size: 0.65rem;
+    font-size: 0.58rem;
     font-weight: 600;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
     color: var(--accent);
   }
 
-  .label {
-    font-size: 0.65rem;
-    font-weight: 500;
-    letter-spacing: 0.07em;
-    text-transform: uppercase;
-    color: var(--subtext);
+  /* ── Bar ─────────────────────────────────────────── */
+
+  .bar-wrap {
+    padding-top: 0.2rem;
+  }
+
+  .bar-track {
+    position: relative;
+    height: 3px;
+    background: var(--border-subtle);
+    border-radius: 99px;
+  }
+
+  .bar-fill {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 99px;
+    transition: width 150ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    box-shadow: 0 0 5px 1px var(--accent-glow);
+  }
+
+  /* Peak-hold marker — thin vertical tick that fades */
+  .bar-peak {
+    position: absolute;
+    top: -3px;
+    width: 2px;
+    height: 9px;
+    background: var(--accent);
+    border-radius: 1px;
+    transform: translateX(-50%);
+    transition: opacity 700ms ease-out, left 150ms ease-out;
   }
 </style>
