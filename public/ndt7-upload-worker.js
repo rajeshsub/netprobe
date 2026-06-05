@@ -1,44 +1,43 @@
 // WebWorker that runs the ndt7 upload test
-const workerMain = function(ev) {
-  const url = ev.data['///ndt/v7/upload'];
-  const sock = new WebSocket(url, 'net.measurementlab.ndt.v7');
-  let now;
-  if (typeof performance !== 'undefined' &&
-      typeof performance.now === 'function') {
-    now = () => performance.now();
+const workerMain = function (ev) {
+  const url = ev.data['///ndt/v7/upload']
+  const sock = new WebSocket(url, 'net.measurementlab.ndt.v7')
+  let now
+  if (typeof performance !== 'undefined' && typeof performance.now === 'function') {
+    now = () => performance.now()
   } else {
-    now = () => Date.now();
+    now = () => Date.now()
   }
-  uploadTest(sock, postMessage, now);
-};
+  uploadTest(sock, postMessage, now)
+}
 
-const uploadTest = function(sock, postMessage, now) {
-  let closed = false;
-  sock.onclose = function() {
+const uploadTest = function (sock, postMessage, now) {
+  let closed = false
+  sock.onclose = function () {
     if (!closed) {
-      closed = true;
+      closed = true
       postMessage({
         MsgType: 'complete',
-      });
+      })
     }
-  };
+  }
 
-  sock.onerror = function(ev) {
+  sock.onerror = function (ev) {
     postMessage({
       MsgType: 'error',
       Error: ev.type,
-    });
-  };
+    })
+  }
 
-  sock.onmessage = function(ev) {
+  sock.onmessage = function (ev) {
     if (typeof ev.data !== 'undefined') {
       postMessage({
         MsgType: 'measurement',
         Source: 'server',
         ServerMessage: ev.data,
-      });
+      })
     }
-  };
+  }
 
   /**
    * uploader is the main loop that uploads data in the web browser. It must
@@ -72,42 +71,41 @@ const uploadTest = function(sock, postMessage, now) {
     if (closed) {
       // socket.send() with too much buffering causes socket.close(). We only
       // observed this behaviour with pre-Chromium Edge.
-      return;
+      return
     }
-    const t = now();
+    const t = now()
     if (t >= end) {
-      sock.close();
+      sock.close()
       // send one last measurement.
-      postClientMeasurement(total, sock.bufferedAmount, start);
-      return;
+      postClientMeasurement(total, sock.bufferedAmount, start)
+      return
     }
 
-    const maxMessageSize = 8388608; /* = (1<<23) = 8MB */
-    const clientMeasurementInterval = 250; // ms
+    const maxMessageSize = 8388608 /* = (1<<23) = 8MB */
+    const clientMeasurementInterval = 250 // ms
 
     // Message size is doubled after the first 16 messages, and subsequently
     // every 8, up to maxMessageSize.
-    const nextSizeIncrement =
-        (data.length >= maxMessageSize) ? Infinity : 16 * data.length;
-    if ((total - sock.bufferedAmount) >= nextSizeIncrement) {
-      data = new Uint8Array(data.length * 2);
+    const nextSizeIncrement = data.length >= maxMessageSize ? Infinity : 16 * data.length
+    if (total - sock.bufferedAmount >= nextSizeIncrement) {
+      data = new Uint8Array(data.length * 2)
     }
 
     // We keep 7 messages in the send buffer, so there is always some more
     // data to send. The maximum buffer size is 8 * 8MB - 1 byte ~= 64M.
-    const desiredBuffer = 7 * data.length;
+    const desiredBuffer = 7 * data.length
     if (sock.bufferedAmount < desiredBuffer) {
-      sock.send(data);
-      total += data.length;
+      sock.send(data)
+      total += data.length
     }
 
     if (t >= previous + clientMeasurementInterval) {
-      postClientMeasurement(total, sock.bufferedAmount, start);
-      previous = t;
+      postClientMeasurement(total, sock.bufferedAmount, start)
+      previous = t
     }
 
     // Loop the uploader function in a way that respects the JS event handler.
-    setTimeout(() => uploader(data, start, end, previous, total), 0);
+    setTimeout(() => uploader(data, start, end, previous, total), 0)
   }
 
   /** Report measurement back to the main thread.
@@ -118,11 +116,11 @@ const uploadTest = function(sock, postMessage, now) {
    */
   function postClientMeasurement(total, bufferedAmount, start) {
     // bytes sent - bytes buffered = bytes actually sent
-    const numBytes = total - bufferedAmount;
+    const numBytes = total - bufferedAmount
     // ms / 1000 = seconds
-    const elapsedTime = (now() - start) / 1000;
+    const elapsedTime = (now() - start) / 1000
     // bytes * bits/byte * megabits/bit * 1/seconds = Mbps
-    const meanMbps = numBytes * 8 / 1000000 / elapsedTime;
+    const meanMbps = (numBytes * 8) / 1000000 / elapsedTime
     postMessage({
       MsgType: 'measurement',
       ClientData: {
@@ -132,16 +130,16 @@ const uploadTest = function(sock, postMessage, now) {
       },
       Source: 'client',
       Test: 'upload',
-    });
+    })
   }
 
-  sock.onopen = function() {
-    const initialMessageSize = 8192; /* (1<<13) = 8kBytes */
+  sock.onopen = function () {
+    const initialMessageSize = 8192 /* (1<<13) = 8kBytes */
     // TODO(bassosimone): fill this message - see above comment
-    const data = new Uint8Array(initialMessageSize);
-    const start = now(); // ms since epoch
-    const duration = 10000; // ms
-    const end = start + duration; // ms since epoch
+    const data = new Uint8Array(initialMessageSize)
+    const start = now() // ms since epoch
+    const duration = 10000 // ms
+    const end = start + duration // ms since epoch
 
     postMessage({
       MsgType: 'start',
@@ -149,18 +147,18 @@ const uploadTest = function(sock, postMessage, now) {
         StartTime: start / 1000, // seconds since epoch
         ExpectedEndTime: end / 1000, // seconds since epoch
       },
-    });
+    })
 
     // Start the upload loop.
-    uploader(data, start, end, start, 0);
-  };
-};
+    uploader(data, start, end, start, 0)
+  }
+}
 
 // Node and browsers get onmessage defined differently.
 if (typeof self !== 'undefined') {
-  self.onmessage = workerMain;
+  self.onmessage = workerMain
 } else if (typeof this !== 'undefined') {
-  this.onmessage = workerMain;
+  this.onmessage = workerMain
 } else if (typeof onmessage !== 'undefined') {
-  onmessage = workerMain;
+  onmessage = workerMain
 }
