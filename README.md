@@ -38,7 +38,7 @@ Everything runs in the browser. No data is collected, stored or shared by netpro
 
 ## Sharing results
 
-When a test completes, the URL updates automatically. Copy and share it — the results are encoded directly in the hash fragment, so no server storage is involved. The recipient's browser reads the hash and renders the results locally.
+When a test completes, the URL updates automatically. The results are encoded directly in the hash fragment of the URL, so no server storage is involved. The recipient's browser reads the hash and renders the results locally.
 
 ---
 
