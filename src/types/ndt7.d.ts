@@ -42,7 +42,15 @@ declare module '@m-lab/ndt7' {
   type URLMap = Record<string, string>
 
   function discoverServerURLs(config: NDT7Config, callbacks: NDT7Callbacks): Promise<URLMap>
-  function downloadTest(config: NDT7Config, callbacks: NDT7Callbacks, urlPromise: Promise<URLMap>): Promise<number>
-  function uploadTest(config: NDT7Config, callbacks: NDT7Callbacks, urlPromise: Promise<URLMap>): Promise<number>
+  function downloadTest(
+    config: NDT7Config,
+    callbacks: NDT7Callbacks,
+    urlPromise: Promise<URLMap>
+  ): Promise<number>
+  function uploadTest(
+    config: NDT7Config,
+    callbacks: NDT7Callbacks,
+    urlPromise: Promise<URLMap>
+  ): Promise<number>
   function test(config: NDT7Config, callbacks: NDT7Callbacks): Promise<number>
 }

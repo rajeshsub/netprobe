@@ -22,10 +22,10 @@ async function probe(url: string): Promise<boolean> {
 async function lossRateForUrl(url: string): Promise<number> {
   // Stagger into two batches to catch intermittent drops, not just one-off failures.
   const r1 = await Promise.all(Array.from({ length: Math.ceil(PROBES / 2) }, () => probe(url)))
-  await new Promise(r => setTimeout(r, 150))
+  await new Promise((r) => setTimeout(r, 150))
   const r2 = await Promise.all(Array.from({ length: Math.floor(PROBES / 2) }, () => probe(url)))
   const all = [...r1, ...r2]
-  return (all.filter(ok => !ok).length / all.length) * 100
+  return (all.filter((ok) => !ok).length / all.length) * 100
 }
 
 // Highly-available public endpoints first — these are far more reliable than
@@ -40,16 +40,16 @@ export async function measurePacketLoss(regionHostnames: string[]): Promise<numb
   // Test three independent endpoints in parallel and average their loss rates.
   // Using multiple independent targets prevents a single unreachable server
   // from falsely reporting 100% loss.
-  const candidates = [
-    ...PRIORITY_ENDPOINTS,
-    ...regionHostnames.map(h => `https://${h}/`),
-  ].slice(0, 4)
+  const candidates = [...PRIORITY_ENDPOINTS, ...regionHostnames.map((h) => `https://${h}/`)].slice(
+    0,
+    4
+  )
 
   const results = await Promise.allSettled(candidates.map(lossRateForUrl))
 
   const values = results
     .filter((r): r is PromiseFulfilledResult<number> => r.status === 'fulfilled')
-    .map(r => r.value)
+    .map((r) => r.value)
 
   if (values.length === 0) return null
 

@@ -16,6 +16,7 @@ const sample: TestResults = {
     { name: 'Asia East', downloadMbps: null, uploadMbps: null, latencyMs: null, error: 'failed' },
   ],
   timestamp: 1748600000000,
+  healthChecks: null,
 }
 
 describe('encode / decode round-trip', () => {

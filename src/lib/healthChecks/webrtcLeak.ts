@@ -16,7 +16,7 @@ const PRIVATE_PATTERNS = [
 ]
 
 function isPublicIp(ip: string): boolean {
-  return !PRIVATE_PATTERNS.some(re => re.test(ip))
+  return !PRIVATE_PATTERNS.some((re) => re.test(ip))
 }
 
 function extractIps(candidate: string): string[] {
@@ -27,34 +27,41 @@ function extractIps(candidate: string): string[] {
 }
 
 async function gatherViaStun(stunUrls: string[]): Promise<string[]> {
-  return new Promise(resolve => {
+  return new Promise((resolve) => {
     const ips = new Set<string>()
     let done = false
 
     const finish = () => {
       if (done) return
       done = true
-      try { pc.close() } catch { /* ignore */ }
+      try {
+        pc.close()
+      } catch {
+        /* ignore */
+      }
       resolve([...ips])
     }
 
     let pc: RTCPeerConnection
     try {
-      pc = new RTCPeerConnection({ iceServers: stunUrls.map(urls => ({ urls })) })
+      pc = new RTCPeerConnection({ iceServers: stunUrls.map((urls) => ({ urls })) })
     } catch {
       return resolve([])
     }
 
     pc.createDataChannel('')
-    pc.onicecandidate = e => {
-      if (!e.candidate) { finish(); return }
-      extractIps(e.candidate.candidate).forEach(ip => ips.add(ip))
+    pc.onicecandidate = (e) => {
+      if (!e.candidate) {
+        finish()
+        return
+      }
+      extractIps(e.candidate.candidate).forEach((ip) => ips.add(ip))
     }
     pc.onicegatheringstatechange = () => {
       if (pc.iceGatheringState === 'complete') finish()
     }
     pc.createOffer()
-      .then(o => pc.setLocalDescription(o))
+      .then((o) => pc.setLocalDescription(o))
       .catch(finish)
 
     // Hard timeout in case ICE gathering stalls
@@ -83,9 +90,7 @@ export async function detectWebRTCLeak(reportedPublicIp: string | null): Promise
   const publicIps = [...new Set(allIps.filter(isPublicIp))]
 
   const leakDetected =
-    reportedPublicIp !== null &&
-    publicIps.length > 0 &&
-    !publicIps.includes(reportedPublicIp)
+    reportedPublicIp !== null && publicIps.length > 0 && !publicIps.includes(reportedPublicIp)
 
   return { publicIps, leakDetected }
 }

@@ -38,7 +38,7 @@ export function computeBufferBloat(
 }
 
 function ping(url: string): Promise<number> {
-  return new Promise(resolve => {
+  return new Promise((resolve) => {
     const t = performance.now()
     const img = new Image()
     const done = () => resolve(performance.now() - t)
@@ -60,8 +60,12 @@ export async function measureBufferBloat(
 ): Promise<BufferBloatResult> {
   const baselineSamples: number[] = []
   for (let i = 0; i < 5; i++) {
-    try { baselineSamples.push(await ping(pingUrl)) } catch { /* skip */ }
-    await new Promise<void>(r => setTimeout(r, 100))
+    try {
+      baselineSamples.push(await ping(pingUrl))
+    } catch {
+      /* skip */
+    }
+    await new Promise<void>((r) => setTimeout(r, 100))
   }
 
   const downloadSamples: number[] = []
@@ -76,8 +80,10 @@ export async function measureBufferBloat(
         if (inUpload) uploadSamples.push(ms)
         else downloadSamples.push(ms)
         onSample(ms)
-      } catch { /* skip */ }
-      await new Promise<void>(r => setTimeout(r, 200))
+      } catch {
+        /* skip */
+      }
+      await new Promise<void>((r) => setTimeout(r, 200))
     }
   }
 

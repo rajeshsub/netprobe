@@ -81,15 +81,17 @@
           <span
             class="chip"
             class:current={done && g === grade}
-            style={done && g === grade ? `background:${gradeColor[g]}22;color:${gradeColor[g]};border-color:${gradeColor[g]}` : ''}
-          >{g}</span>
+            style={done && g === grade
+              ? `background:${gradeColor[g]}22;color:${gradeColor[g]};border-color:${gradeColor[g]}`
+              : ''}>{g}</span
+          >
         {/each}
         <button
           class="info-btn"
-          onclick={() => showInfo = !showInfo}
+          onclick={() => (showInfo = !showInfo)}
           aria-label="Grade info"
-          aria-expanded={showInfo}
-        >ⓘ</button>
+          aria-expanded={showInfo}>ⓘ</button
+        >
       </div>
     </div>
 
@@ -126,7 +128,9 @@
     border: 1px solid var(--border-subtle);
     border-radius: 16px;
     padding: 0.875rem 0.875rem 0.75rem;
-    transition: border-color 0.25s, box-shadow 0.25s;
+    transition:
+      border-color 0.25s,
+      box-shadow 0.25s;
     container-type: inline-size;
     display: flex;
     flex-direction: column;
@@ -134,7 +138,9 @@
 
   .panel.active {
     border-color: var(--accent);
-    box-shadow: 0 0 0 1px var(--accent), 0 0 24px var(--accent-glow);
+    box-shadow:
+      0 0 0 1px var(--accent),
+      0 0 24px var(--accent-glow);
   }
 
   .top {
@@ -299,12 +305,27 @@
 
   /* Narrow container (inside metrics-grid cell at equal width with gauges) */
   @container (max-width: 240px) {
-    .graph-col { display: none; }
-    .grade-scale { display: none; }
-    .info-box { display: none; }
-    .top { gap: 0; justify-content: center; }
-    .grade-col { flex: 1; min-width: 0; width: 100%; }
-    .section-label { align-self: flex-start; }
+    .graph-col {
+      display: none;
+    }
+    .grade-scale {
+      display: none;
+    }
+    .info-box {
+      display: none;
+    }
+    .top {
+      gap: 0;
+      justify-content: center;
+    }
+    .grade-col {
+      flex: 1;
+      min-width: 0;
+      width: 100%;
+    }
+    .section-label {
+      align-self: flex-start;
+    }
   }
 
   @media (max-width: 480px) {

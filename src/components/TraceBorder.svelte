@@ -66,16 +66,40 @@
    */
   @keyframes trace-perimeter {
     /* top: left → right */
-    0%     { top: 0%;    left: 0%; }
-    37.5%  { top: 0%;    left: 100%; }
+    0% {
+      top: 0%;
+      left: 0%;
+    }
+    37.5% {
+      top: 0%;
+      left: 100%;
+    }
     /* right: top → bottom */
-    37.5%  { top: 0%;    left: 100%; }
-    50%    { top: 100%;  left: 100%; }
+    37.5% {
+      top: 0%;
+      left: 100%;
+    }
+    50% {
+      top: 100%;
+      left: 100%;
+    }
     /* bottom: right → left */
-    50%    { top: 100%;  left: 100%; }
-    87.5%  { top: 100%;  left: 0%; }
+    50% {
+      top: 100%;
+      left: 100%;
+    }
+    87.5% {
+      top: 100%;
+      left: 0%;
+    }
     /* left: bottom → top */
-    87.5%  { top: 100%;  left: 0%; }
-    100%   { top: 0%;    left: 0%; }
+    87.5% {
+      top: 100%;
+      left: 0%;
+    }
+    100% {
+      top: 0%;
+      left: 0%;
+    }
   }
 </style>

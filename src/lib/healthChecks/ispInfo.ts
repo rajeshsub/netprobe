@@ -13,7 +13,9 @@ async function tryIpApiCo(): Promise<IspInfo> {
 }
 
 async function tryIpApiCom(): Promise<IspInfo> {
-  const res = await fetch('https://ip-api.com/json/?fields=status,isp,as,city,query', { signal: AbortSignal.timeout(4000) })
+  const res = await fetch('https://ip-api.com/json/?fields=status,isp,as,city,query', {
+    signal: AbortSignal.timeout(4000),
+  })
   const d = await res.json()
   if (d.status !== 'success') throw new Error('failed')
   return { isp: d.isp ?? '', asn: d.as ?? '', city: d.city ?? '', ip: d.query ?? '' }
@@ -27,7 +29,9 @@ async function tryIpInfo(): Promise<IspInfo> {
 }
 
 async function tryCloudflareTrace(): Promise<IspInfo> {
-  const res = await fetch('https://cloudflare.com/cdn-cgi/trace', { signal: AbortSignal.timeout(4000) })
+  const res = await fetch('https://cloudflare.com/cdn-cgi/trace', {
+    signal: AbortSignal.timeout(4000),
+  })
   const text = await res.text()
   const get = (key: string) => text.match(new RegExp(`^${key}=(.+)$`, 'm'))?.[1]?.trim() ?? ''
   const ip = get('ip')
@@ -42,7 +46,7 @@ const PROVIDERS = [tryIpApiCo, tryIpApiCom, tryIpInfo, tryCloudflareTrace]
 // holds open connections and starves other concurrent network activity.
 export async function getIspInfo(): Promise<IspInfo | null> {
   try {
-    return await Promise.any(PROVIDERS.map(fn => fn()))
+    return await Promise.any(PROVIDERS.map((fn) => fn()))
   } catch {
     return null
   }

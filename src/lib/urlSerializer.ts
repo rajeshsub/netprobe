@@ -48,10 +48,12 @@ function truncate(s: string, max: number): string {
 }
 
 export function encode(results: TestResults): string {
-  const regionStr = results.regions.map(reg => {
-    if (reg.error) return `${encodeURIComponent(reg.name)}:err`
-    return `${encodeURIComponent(reg.name)}:${r(reg.downloadMbps)}:${r(reg.uploadMbps)}:${r(reg.latencyMs)}`
-  }).join(',')
+  const regionStr = results.regions
+    .map((reg) => {
+      if (reg.error) return `${encodeURIComponent(reg.name)}:err`
+      return `${encodeURIComponent(reg.name)}:${r(reg.downloadMbps)}:${r(reg.uploadMbps)}:${r(reg.latencyMs)}`
+    })
+    .join(',')
 
   const params = new URLSearchParams({
     v: '1',
@@ -68,16 +70,21 @@ export function encode(results: TestResults): string {
 
   const h = results.healthChecks
   if (h) {
-    if (h.isp)                              params.set('isp', truncate(h.isp, 32))
-    if (h.asn)                              params.set('asn', h.asn)
-    if (h.city)                             params.set('city', h.city)
-    if (h.connectionType)                   params.set('ct', h.connectionType)
-    if (h.effectiveConnectionType)          params.set('ect', h.effectiveConnectionType)
-    if (h.webrtcLeakDetected !== null)      params.set('wrtc', h.webrtcLeakDetected ? '1' : '0')
-    if (h.packetLossPercent !== null)       params.set('pl', r(h.packetLossPercent))
-    if (h.dnsTimeMs !== null)               params.set('dns', r(h.dnsTimeMs, 0))
+    if (h.isp) params.set('isp', truncate(h.isp, 32))
+    if (h.asn) params.set('asn', h.asn)
+    if (h.city) params.set('city', h.city)
+    if (h.connectionType) params.set('ct', h.connectionType)
+    if (h.effectiveConnectionType) params.set('ect', h.effectiveConnectionType)
+    if (h.webrtcLeakDetected !== null) params.set('wrtc', h.webrtcLeakDetected ? '1' : '0')
+    if (h.packetLossPercent !== null) params.set('pl', r(h.packetLossPercent))
+    if (h.dnsTimeMs !== null) params.set('dns', r(h.dnsTimeMs, 0))
     if (h.cdnLatencies && h.cdnLatencies.length > 0) {
-      params.set('cdn', h.cdnLatencies.map(c => `${encodeURIComponent(c.name)}:${Math.round(c.latencyMs)}`).join(','))
+      params.set(
+        'cdn',
+        h.cdnLatencies
+          .map((c) => `${encodeURIComponent(c.name)}:${Math.round(c.latencyMs)}`)
+          .join(',')
+      )
     }
   }
 
@@ -104,25 +111,28 @@ export function decode(hash: string): TestResults | null {
     if (!['A', 'B', 'C', 'D', 'F'].includes(bbg)) return null
 
     const regionStr = params.get('r') ?? ''
-    const regions: RegionResult[] = regionStr ? regionStr.split(',').map(part => {
-      const segs = part.split(':')
-      const name = decodeURIComponent(segs[0])
-      if (segs[1] === 'err') return { name, downloadMbps: null, uploadMbps: null, latencyMs: null, error: 'failed' }
-      return {
-        name,
-        downloadMbps: parseFloat(segs[1]) || null,
-        uploadMbps: parseFloat(segs[2]) || null,
-        latencyMs: parseFloat(segs[3]) || null,
-        error: null,
-      }
-    }) : []
+    const regions: RegionResult[] = regionStr
+      ? regionStr.split(',').map((part) => {
+          const segs = part.split(':')
+          const name = decodeURIComponent(segs[0])
+          if (segs[1] === 'err')
+            return { name, downloadMbps: null, uploadMbps: null, latencyMs: null, error: 'failed' }
+          return {
+            name,
+            downloadMbps: parseFloat(segs[1]) || null,
+            uploadMbps: parseFloat(segs[2]) || null,
+            latencyMs: parseFloat(segs[3]) || null,
+            error: null,
+          }
+        })
+      : []
 
     // Health checks are optional — absent in v1 links generated before this feature.
     let healthChecks: HealthCheckResults | null = null
     if (params.has('isp') || params.has('pl') || params.has('wrtc')) {
       const cdnStr = params.get('cdn') ?? ''
       const cdnLatencies: CdnLatency[] = cdnStr
-        ? cdnStr.split(',').map(seg => {
+        ? cdnStr.split(',').map((seg) => {
             const [name, ms] = seg.split(':')
             return { name: decodeURIComponent(name), latencyMs: parseFloat(ms) || 0 }
           })
@@ -146,7 +156,18 @@ export function decode(hash: string): TestResults | null {
       }
     }
 
-    return { downloadMbps: dl, uploadMbps: ul, latencyMs: lat, jitterMs: j, bufferBloatDelta: bb, bufferBloatGrade: bbg, nearestRegion: nr, regions, timestamp: ts, healthChecks }
+    return {
+      downloadMbps: dl,
+      uploadMbps: ul,
+      latencyMs: lat,
+      jitterMs: j,
+      bufferBloatDelta: bb,
+      bufferBloatGrade: bbg,
+      nearestRegion: nr,
+      regions,
+      timestamp: ts,
+      healthChecks,
+    }
   } catch {
     return null
   }
