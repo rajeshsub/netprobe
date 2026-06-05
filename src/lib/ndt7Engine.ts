@@ -26,7 +26,11 @@ export interface NDT7Callbacks {
 
 function extractHostname(urls: Record<string, string>): string {
   const downloadUrl = urls['wss:///ndt/v7/download'] || ''
-  try { return new URL(downloadUrl).hostname } catch { return '' }
+  try {
+    return new URL(downloadUrl).hostname
+  } catch {
+    return ''
+  }
 }
 
 function mbpsFromClientData(data: { MeanClientMbps?: number }): number {
@@ -42,7 +46,7 @@ function latencyFromServerMeasurement(m: { TCPInfo?: { MinRTT?: number; RTTVar?:
 function rttFromServerMeasurement(m: Record<string, unknown>): number {
   const tcpInfo = m.TCPInfo as { RTT?: number; SmoothedRTT?: number } | undefined
   const rtt = tcpInfo?.RTT ?? tcpInfo?.SmoothedRTT ?? 0
-  return rtt / 1000  // μs → ms
+  return rtt / 1000 // μs → ms
 }
 
 // Build WebSocket URL map for a known server, bypassing the locate API entirely.
@@ -77,46 +81,72 @@ export async function runTestDirect(
 
   callbacks.onServerChosen?.(hostname)
 
-  await downloadTest(baseConfig, {
-    downloadStart: () => callbacks.onDownloadStart?.(),
-    downloadMeasurement: ({ Source, Data }: { Source: string; Data: Record<string, unknown> }) => {
-      if (Source === 'client') {
-        const sample = {
-          elapsedSeconds: (Data.ElapsedTime as number) ?? 0,
-          mbps: mbpsFromClientData(Data as { MeanClientMbps?: number }),
+  await downloadTest(
+    baseConfig,
+    {
+      downloadStart: () => callbacks.onDownloadStart?.(),
+      downloadMeasurement: ({
+        Source,
+        Data,
+      }: {
+        Source: string
+        Data: Record<string, unknown>
+      }) => {
+        if (Source === 'client') {
+          const sample = {
+            elapsedSeconds: (Data.ElapsedTime as number) ?? 0,
+            mbps: mbpsFromClientData(Data as { MeanClientMbps?: number }),
+          }
+          downloadMbps = sample.mbps
+          callbacks.onDownloadSample?.(sample)
+        } else {
+          const rtt = rttFromServerMeasurement(Data)
+          if (rtt > 0) callbacks.onLatencySample?.(rtt)
+          const { latencyMs: l, jitterMs: j } = latencyFromServerMeasurement(
+            Data as { TCPInfo?: { MinRTT?: number; RTTVar?: number } }
+          )
+          if (l > 0) {
+            latencyMs = l
+            jitterMs = j
+          }
         }
-        downloadMbps = sample.mbps
-        callbacks.onDownloadSample?.(sample)
-      } else {
-        const rtt = rttFromServerMeasurement(Data)
-        if (rtt > 0) callbacks.onLatencySample?.(rtt)
-        const { latencyMs: l, jitterMs: j } = latencyFromServerMeasurement(Data as { TCPInfo?: { MinRTT?: number; RTTVar?: number } })
-        if (l > 0) { latencyMs = l; jitterMs = j }
-      }
+      },
+      downloadComplete: ({
+        LastServerMeasurement,
+      }: {
+        LastServerMeasurement?: { TCPInfo?: { MinRTT?: number; RTTVar?: number } }
+      }) => {
+        if (LastServerMeasurement) {
+          const { latencyMs: l, jitterMs: j } = latencyFromServerMeasurement(LastServerMeasurement)
+          if (l > 0) {
+            latencyMs = l
+            jitterMs = j
+          }
+        }
+        callbacks.onDownloadComplete?.()
+      },
+      error: (msg: string) => callbacks.onError?.(msg),
     },
-    downloadComplete: ({ LastServerMeasurement }: { LastServerMeasurement?: { TCPInfo?: { MinRTT?: number; RTTVar?: number } } }) => {
-      if (LastServerMeasurement) {
-        const { latencyMs: l, jitterMs: j } = latencyFromServerMeasurement(LastServerMeasurement)
-        if (l > 0) { latencyMs = l; jitterMs = j }
-      }
-      callbacks.onDownloadComplete?.()
-    },
-    error: (msg: string) => callbacks.onError?.(msg),
-  }, urlPromise)
+    urlPromise
+  )
 
-  await uploadTest(baseConfig, {
-    uploadMeasurement: ({ Source, Data }: { Source: string; Data: Record<string, unknown> }) => {
-      if (Source === 'client') {
-        const sample = {
-          elapsedSeconds: (Data.ElapsedTime as number) ?? 0,
-          mbps: mbpsFromClientData(Data as { MeanClientMbps?: number }),
+  await uploadTest(
+    baseConfig,
+    {
+      uploadMeasurement: ({ Source, Data }: { Source: string; Data: Record<string, unknown> }) => {
+        if (Source === 'client') {
+          const sample = {
+            elapsedSeconds: (Data.ElapsedTime as number) ?? 0,
+            mbps: mbpsFromClientData(Data as { MeanClientMbps?: number }),
+          }
+          uploadMbps = sample.mbps
+          callbacks.onUploadSample?.(sample)
         }
-        uploadMbps = sample.mbps
-        callbacks.onUploadSample?.(sample)
-      }
+      },
+      error: (msg: string) => callbacks.onError?.(msg),
     },
-    error: (msg: string) => callbacks.onError?.(msg),
-  }, urlPromise)
+    urlPromise
+  )
 
   return { downloadMbps, uploadMbps, latencyMs, jitterMs, serverHostname: hostname }
 }
@@ -151,48 +181,74 @@ export async function runTest(
     error: (msg: string) => callbacks.onError?.(msg),
   })
 
-  await downloadTest(baseConfig, {
-    downloadStart: () => callbacks.onDownloadStart?.(),
-    downloadMeasurement: ({ Source, Data }: { Source: string; Data: Record<string, unknown> }) => {
-      if (Source === 'client') {
-        const sample = {
-          elapsedSeconds: (Data.ElapsedTime as number) ?? 0,
-          mbps: mbpsFromClientData(Data as { MeanClientMbps?: number }),
-        }
-        downloadMbps = sample.mbps
-        callbacks.onDownloadSample?.(sample)
-      } else {
-        // Emit current smoothed RTT for the live sparkline
-        const rtt = rttFromServerMeasurement(Data)
-        if (rtt > 0) callbacks.onLatencySample?.(rtt)
+  await downloadTest(
+    baseConfig,
+    {
+      downloadStart: () => callbacks.onDownloadStart?.(),
+      downloadMeasurement: ({
+        Source,
+        Data,
+      }: {
+        Source: string
+        Data: Record<string, unknown>
+      }) => {
+        if (Source === 'client') {
+          const sample = {
+            elapsedSeconds: (Data.ElapsedTime as number) ?? 0,
+            mbps: mbpsFromClientData(Data as { MeanClientMbps?: number }),
+          }
+          downloadMbps = sample.mbps
+          callbacks.onDownloadSample?.(sample)
+        } else {
+          // Emit current smoothed RTT for the live sparkline
+          const rtt = rttFromServerMeasurement(Data)
+          if (rtt > 0) callbacks.onLatencySample?.(rtt)
 
-        const { latencyMs: l, jitterMs: j } = latencyFromServerMeasurement(Data as { TCPInfo?: { MinRTT?: number; RTTVar?: number } })
-        if (l > 0) { latencyMs = l; jitterMs = j }
-      }
-    },
-    downloadComplete: ({ LastServerMeasurement }: { LastServerMeasurement?: { TCPInfo?: { MinRTT?: number; RTTVar?: number } } }) => {
-      if (LastServerMeasurement) {
-        const { latencyMs: l, jitterMs: j } = latencyFromServerMeasurement(LastServerMeasurement)
-        if (l > 0) { latencyMs = l; jitterMs = j }
-      }
-      callbacks.onDownloadComplete?.()
-    },
-    error: (msg: string) => callbacks.onError?.(msg),
-  }, urlPromise)
-
-  await uploadTest(baseConfig, {
-    uploadMeasurement: ({ Source, Data }: { Source: string; Data: Record<string, unknown> }) => {
-      if (Source === 'client') {
-        const sample = {
-          elapsedSeconds: (Data.ElapsedTime as number) ?? 0,
-          mbps: mbpsFromClientData(Data as { MeanClientMbps?: number }),
+          const { latencyMs: l, jitterMs: j } = latencyFromServerMeasurement(
+            Data as { TCPInfo?: { MinRTT?: number; RTTVar?: number } }
+          )
+          if (l > 0) {
+            latencyMs = l
+            jitterMs = j
+          }
         }
-        uploadMbps = sample.mbps
-        callbacks.onUploadSample?.(sample)
-      }
+      },
+      downloadComplete: ({
+        LastServerMeasurement,
+      }: {
+        LastServerMeasurement?: { TCPInfo?: { MinRTT?: number; RTTVar?: number } }
+      }) => {
+        if (LastServerMeasurement) {
+          const { latencyMs: l, jitterMs: j } = latencyFromServerMeasurement(LastServerMeasurement)
+          if (l > 0) {
+            latencyMs = l
+            jitterMs = j
+          }
+        }
+        callbacks.onDownloadComplete?.()
+      },
+      error: (msg: string) => callbacks.onError?.(msg),
     },
-    error: (msg: string) => callbacks.onError?.(msg),
-  }, urlPromise)
+    urlPromise
+  )
+
+  await uploadTest(
+    baseConfig,
+    {
+      uploadMeasurement: ({ Source, Data }: { Source: string; Data: Record<string, unknown> }) => {
+        if (Source === 'client') {
+          const sample = {
+            elapsedSeconds: (Data.ElapsedTime as number) ?? 0,
+            mbps: mbpsFromClientData(Data as { MeanClientMbps?: number }),
+          }
+          uploadMbps = sample.mbps
+          callbacks.onUploadSample?.(sample)
+        }
+      },
+      error: (msg: string) => callbacks.onError?.(msg),
+    },
+    urlPromise
+  )
 
   return { downloadMbps, uploadMbps, latencyMs, jitterMs, serverHostname: serverHostnameResolved }
 }

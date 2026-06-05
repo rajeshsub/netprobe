@@ -27,58 +27,71 @@
     // Verify worker files are reachable — silent 404 is the most common cause of 0-data tests
     const { workerBase } = config
     fetch(`${workerBase}ndt7-download-worker.js`, { method: 'HEAD' })
-      .then(r => {
-        if (!r.ok) console.error(`[netprobe] worker file not found: ${workerBase}ndt7-download-worker.js (${r.status})`)
+      .then((r) => {
+        if (!r.ok)
+          console.error(
+            `[netprobe] worker file not found: ${workerBase}ndt7-download-worker.js (${r.status})`
+          )
         else console.log(`[netprobe] worker files OK at ${workerBase}`)
       })
-      .catch(e => console.error('[netprobe] worker file fetch failed:', e))
+      .catch((e) => console.error('[netprobe] worker file fetch failed:', e))
   })
 
   const TOTAL_REGIONS = 5
 
   // Step definitions — order matters for progress tracking
   const STEPS = [
-    { id: 'server',       label: 'Server discovery' },
-    { id: 'download',     label: 'Download test' },
+    { id: 'server', label: 'Server discovery' },
+    { id: 'download', label: 'Download test' },
     { id: 'buffer_bloat', label: 'Buffer bloat' },
-    { id: 'upload',       label: 'Upload test' },
-    { id: 'global',       label: 'Global regions' },
-    { id: 'health',       label: 'Connection health' },
+    { id: 'upload', label: 'Upload test' },
+    { id: 'global', label: 'Global regions' },
+    { id: 'health', label: 'Connection health' },
   ] as const
 
-  type StepId = typeof STEPS[number]['id']
+  type StepId = (typeof STEPS)[number]['id']
 
   function isStepDone(id: StepId): boolean {
     const ph = testState.phase
     switch (id) {
-      case 'server':       return ['nearest_download', 'nearest_upload', 'global', 'health', 'done'].includes(ph)
-      case 'download':     return ['nearest_upload', 'global', 'health', 'done'].includes(ph)
-      case 'buffer_bloat': return testState.bufferBloatReady
-      case 'upload':       return ['global', 'health', 'done'].includes(ph)
-      case 'global':       return ['health', 'done'].includes(ph)
-      case 'health':       return ph === 'done'
+      case 'server':
+        return ['nearest_download', 'nearest_upload', 'global', 'health', 'done'].includes(ph)
+      case 'download':
+        return ['nearest_upload', 'global', 'health', 'done'].includes(ph)
+      case 'buffer_bloat':
+        return testState.bufferBloatReady
+      case 'upload':
+        return ['global', 'health', 'done'].includes(ph)
+      case 'global':
+        return ['health', 'done'].includes(ph)
+      case 'health':
+        return ph === 'done'
     }
   }
 
   function isStepActive(id: StepId): boolean {
     const ph = testState.phase
     switch (id) {
-      case 'server':       return ph === 'locating'
-      case 'download':     return ph === 'nearest_download'
-      case 'buffer_bloat': return (ph === 'nearest_download' || ph === 'nearest_upload') && !testState.bufferBloatReady
-      case 'upload':       return ph === 'nearest_upload'
-      case 'global':       return ph === 'global'
-      case 'health':       return ph === 'health'
+      case 'server':
+        return ph === 'locating'
+      case 'download':
+        return ph === 'nearest_download'
+      case 'buffer_bloat':
+        return (ph === 'nearest_download' || ph === 'nearest_upload') && !testState.bufferBloatReady
+      case 'upload':
+        return ph === 'nearest_upload'
+      case 'global':
+        return ph === 'global'
+      case 'health':
+        return ph === 'health'
     }
   }
 
-  const completedStepCount = $derived(STEPS.filter(s => isStepDone(s.id)).length)
+  const completedStepCount = $derived(STEPS.filter((s) => isStepDone(s.id)).length)
   const progressPct = $derived(Math.round((completedStepCount / STEPS.length) * 100))
 
   const isRunning = $derived(
-    testState.phase !== 'idle' &&
-    testState.phase !== 'done' &&
-    testState.phase !== 'error'
+    testState.phase !== 'idle' && testState.phase !== 'done' && testState.phase !== 'error'
   )
 
   const isDone = $derived(testState.phase === 'done')
@@ -96,11 +109,21 @@
           if (p === 'nearest_download' && traceEpoch === 0) traceEpoch = Date.now()
           testState.phase = p
         },
-        onDownloadSample: (s) => { testState.downloadMbps = s.mbps },
-        onUploadSample: (s) => { testState.uploadMbps = s.mbps },
-        onLatencySample: (ms) => { testState.addLatencySample(ms) },
-        onRegionComplete: (r) => { testState.addRegion(r) },
-        onNearestServer: (h) => { testState.nearestRegion = h },
+        onDownloadSample: (s) => {
+          testState.downloadMbps = s.mbps
+        },
+        onUploadSample: (s) => {
+          testState.uploadMbps = s.mbps
+        },
+        onLatencySample: (ms) => {
+          testState.addLatencySample(ms)
+        },
+        onRegionComplete: (r) => {
+          testState.addRegion(r)
+        },
+        onNearestServer: (h) => {
+          testState.nearestRegion = h
+        },
         onNearestComplete: (lat, jit) => {
           testState.latencyMs = lat
           testState.jitterMs = jit
@@ -112,8 +135,12 @@
           testState.bufferBloatUploadDelta = r.uploadDelta ?? null
           testState.bufferBloatReady = true
         },
-        onHealthComplete: (h) => { testState.healthChecks = h },
-        onError: (msg) => { testState.error = msg },
+        onHealthComplete: (h) => {
+          testState.healthChecks = h
+        },
+        onError: (msg) => {
+          testState.error = msg
+        },
       })
 
       testState.latencyMs = results.latencyMs
@@ -132,7 +159,9 @@
   async function copyLink() {
     await navigator.clipboard.writeText(window.location.href)
     copied = true
-    setTimeout(() => { copied = false }, 2000)
+    setTimeout(() => {
+      copied = false
+    }, 2000)
   }
 </script>
 
@@ -157,13 +186,18 @@
     {#if testState.phase === 'idle'}
       <div class="hero">
         <p class="hero-desc">
-          Measures download &amp; upload speed, latency, jitter, and buffer bloat — the hidden killer of connection quality. Tests your nearest server plus 5 global regions.
+          Measures download &amp; upload speed, latency, jitter, and buffer bloat — the hidden
+          killer of connection quality. Tests your nearest server plus 5 global regions.
         </p>
         <button class="start-btn" onclick={startTest}>Start Test</button>
       </div>
     {:else}
       {#if isRunning || isDone}
-        <div class="progress-panel" class:panel-done={isDone && testProducedData} class:panel-warn={isDone && !testProducedData}>
+        <div
+          class="progress-panel"
+          class:panel-done={isDone && testProducedData}
+          class:panel-warn={isDone && !testProducedData}
+        >
           <!-- Progress bar row -->
           <div class="progress-header">
             {#if isDone && testProducedData}
@@ -180,7 +214,13 @@
             {:else}
               <span class="progress-label">Step {completedStepCount} of {STEPS.length}</span>
             {/if}
-            <div class="progress-track" role="progressbar" aria-valuenow={progressPct} aria-valuemin={0} aria-valuemax={100}>
+            <div
+              class="progress-track"
+              role="progressbar"
+              aria-valuenow={progressPct}
+              aria-valuemin={0}
+              aria-valuemax={100}
+            >
               <div class="progress-fill" style="width: {progressPct}%"></div>
             </div>
           </div>
@@ -241,25 +281,42 @@
             active={testState.phase === 'nearest_upload'}
           />
         </TraceBorder>
-        <TraceBorder active={testState.phase === 'nearest_download' || testState.phase === 'nearest_upload' || (testState.latencyMs === 0 && isRunning)} syncEpoch={traceEpoch}>
+        <TraceBorder
+          active={testState.phase === 'nearest_download' ||
+            testState.phase === 'nearest_upload' ||
+            (testState.latencyMs === 0 && isRunning)}
+          syncEpoch={traceEpoch}
+        >
           <SpeedGauge
             value={testState.latencyMs}
             max={150}
             label="Latency"
             unit="ms"
-            active={testState.phase === 'nearest_download' || testState.phase === 'nearest_upload' || (testState.latencyMs === 0 && isRunning)}
+            active={testState.phase === 'nearest_download' ||
+              testState.phase === 'nearest_upload' ||
+              (testState.latencyMs === 0 && isRunning)}
           />
         </TraceBorder>
-        <TraceBorder active={testState.phase === 'nearest_download' || testState.phase === 'nearest_upload' || (testState.jitterMs === 0 && isRunning)} syncEpoch={traceEpoch}>
+        <TraceBorder
+          active={testState.phase === 'nearest_download' ||
+            testState.phase === 'nearest_upload' ||
+            (testState.jitterMs === 0 && isRunning)}
+          syncEpoch={traceEpoch}
+        >
           <SpeedGauge
             value={testState.jitterMs}
             max={50}
             label="Jitter"
             unit="ms"
-            active={testState.phase === 'nearest_download' || testState.phase === 'nearest_upload' || (testState.jitterMs === 0 && isRunning)}
+            active={testState.phase === 'nearest_download' ||
+              testState.phase === 'nearest_upload' ||
+              (testState.jitterMs === 0 && isRunning)}
           />
         </TraceBorder>
-        <TraceBorder active={testState.phase === 'nearest_download' || testState.phase === 'nearest_upload'} syncEpoch={traceEpoch}>
+        <TraceBorder
+          active={testState.phase === 'nearest_download' || testState.phase === 'nearest_upload'}
+          syncEpoch={traceEpoch}
+        >
           <BufferBloatPanel
             grade={testState.bufferBloatGrade}
             delta={testState.bufferBloatDelta}
@@ -274,10 +331,7 @@
 
       {#if testState.phase === 'global' || testState.phase === 'health' || testState.phase === 'done' || testState.regions.length > 0}
         <TraceBorder active={testState.phase === 'global'} syncEpoch={traceEpoch}>
-          <RegionTable
-            regions={testState.regions}
-            loading={testState.phase === 'global'}
-          />
+          <RegionTable regions={testState.regions} loading={testState.phase === 'global'} />
         </TraceBorder>
       {/if}
 
@@ -310,9 +364,11 @@
 
   <footer class="container">
     <p>
-      Tests run via <a href="https://www.measurementlab.net/" target="_blank" rel="noreferrer">M-Lab NDT7</a>,
-      <a href="https://speed.cloudflare.com" target="_blank" rel="noreferrer">Cloudflare</a>, and fallback providers.
-      No results stored anywhere.
+      Tests run via <a href="https://www.measurementlab.net/" target="_blank" rel="noreferrer"
+        >M-Lab NDT7</a
+      >,
+      <a href="https://speed.cloudflare.com" target="_blank" rel="noreferrer">Cloudflare</a>, and
+      fallback providers. No results stored anywhere.
     </p>
   </footer>
 </div>
@@ -547,8 +603,15 @@
   }
 
   @keyframes pulse {
-    0%, 100% { opacity: 1; transform: scale(1) }
-    50% { opacity: 0.3; transform: scale(0.7) }
+    0%,
+    100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 0.3;
+      transform: scale(0.7);
+    }
   }
 
   .step-label {
@@ -595,7 +658,9 @@
     padding: 0.875rem 2.75rem;
     border-radius: 10px;
     letter-spacing: 0.01em;
-    transition: opacity 0.15s, box-shadow 0.15s;
+    transition:
+      opacity 0.15s,
+      box-shadow 0.15s;
     box-shadow: 0 0 20px var(--accent-glow);
   }
 

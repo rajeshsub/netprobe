@@ -33,7 +33,10 @@ async function pickFastest(hostnames: string[]): Promise<string> {
     })
   )
   const ok = results
-    .filter((r): r is PromiseFulfilledResult<{ hostname: string; latency: number }> => r.status === 'fulfilled')
+    .filter(
+      (r): r is PromiseFulfilledResult<{ hostname: string; latency: number }> =>
+        r.status === 'fulfilled'
+    )
     .sort((a, b) => a.value.latency - b.value.latency)
   if (ok.length === 0) throw new Error('No servers reachable')
   return ok[0].value.hostname
@@ -89,8 +92,10 @@ async function multiPing(
       const t = await measurePing(url, 3000)
       latencies.push(t)
       onSample?.(t)
-    } catch { /* skip */ }
-    if (i < count - 1) await new Promise(r => setTimeout(r, 100))
+    } catch {
+      /* skip */
+    }
+    if (i < count - 1) await new Promise((r) => setTimeout(r, 100))
   }
   if (latencies.length === 0) throw new Error('Unreachable')
   const sorted = [...latencies].sort((a, b) => a - b)
@@ -104,7 +109,12 @@ export async function ndt7LocateProvider(callbacks: ProviderCallbacks): Promise<
   const { runTest } = await import('./ndt7Engine')
   return new Promise((resolve, reject) => {
     let settled = false
-    const settle = (fn: () => void) => { if (!settled) { settled = true; fn() } }
+    const settle = (fn: () => void) => {
+      if (!settled) {
+        settled = true
+        fn()
+      }
+    }
     runTest(null, {
       onServerChosen: callbacks.onServerChosen,
       onDownloadSample: callbacks.onDownloadSample,
@@ -113,25 +123,30 @@ export async function ndt7LocateProvider(callbacks: ProviderCallbacks): Promise<
       onLatencySample: callbacks.onLatencySample,
       onError: (msg) => settle(() => reject(new Error(`NDT7 locate: ${msg}`))),
     })
-      .then(result => {
+      .then((result) => {
         if (result.downloadMbps === 0 && result.uploadMbps === 0) {
           settle(() => reject(new Error('NDT7 locate: no data returned')))
         } else {
           settle(() => resolve(result))
         }
       })
-      .catch(e => settle(() => reject(e)))
+      .catch((e) => settle(() => reject(e)))
   })
 }
 
 // Provider 2: M-Lab NDT7 direct (bypasses locate API — fixes 429 rate-limit errors)
 export async function ndt7DirectProvider(callbacks: ProviderCallbacks): Promise<ProviderResult> {
   const { runTestDirect } = await import('./ndt7Engine')
-  const hostnames = config.regions.map(r => r.hostname).filter(Boolean)
+  const hostnames = config.regions.map((r) => r.hostname).filter(Boolean)
   const hostname = await pickFastest(hostnames)
   return new Promise((resolve, reject) => {
     let settled = false
-    const settle = (fn: () => void) => { if (!settled) { settled = true; fn() } }
+    const settle = (fn: () => void) => {
+      if (!settled) {
+        settled = true
+        fn()
+      }
+    }
     runTestDirect(hostname, {
       onServerChosen: callbacks.onServerChosen,
       onDownloadSample: callbacks.onDownloadSample,
@@ -140,14 +155,14 @@ export async function ndt7DirectProvider(callbacks: ProviderCallbacks): Promise<
       onLatencySample: callbacks.onLatencySample,
       onError: (msg) => settle(() => reject(new Error(`NDT7 direct: ${msg}`))),
     })
-      .then(result => {
+      .then((result) => {
         if (result.downloadMbps === 0 && result.uploadMbps === 0) {
           settle(() => reject(new Error('NDT7 direct: no data returned')))
         } else {
           settle(() => resolve(result))
         }
       })
-      .catch(e => settle(() => reject(e)))
+      .catch((e) => settle(() => reject(e)))
   })
 }
 
@@ -162,7 +177,7 @@ export async function cloudflareProvider(callbacks: ProviderCallbacks): Promise<
   const downloadMbps = await streamDownload(
     `${BASE}/__down?bytes=${25 * 1024 * 1024}`,
     30_000,
-    s => callbacks.onDownloadSample?.(s)
+    (s) => callbacks.onDownloadSample?.(s)
   )
   callbacks.onDownloadComplete?.()
 
@@ -187,7 +202,7 @@ export async function librespeedProvider(callbacks: ProviderCallbacks): Promise<
   const downloadMbps = await streamDownload(
     `${BASE}/backend/garbage.php?ckSize=25&x=${Date.now()}`,
     30_000,
-    s => callbacks.onDownloadSample?.(s)
+    (s) => callbacks.onDownloadSample?.(s)
   )
   callbacks.onDownloadComplete?.()
 
@@ -209,12 +224,14 @@ export async function httpTimingProvider(callbacks: ProviderCallbacks): Promise<
     const r = await multiPing(`${BASE}/__ping`, 3, callbacks.onLatencySample)
     latencyMs = r.latencyMs
     jitterMs = r.jitterMs
-  } catch { /* best effort */ }
+  } catch {
+    /* best effort */
+  }
 
   const downloadMbps = await streamDownload(
     `${BASE}/__down?bytes=${10 * 1024 * 1024}`,
     20_000,
-    s => callbacks.onDownloadSample?.(s)
+    (s) => callbacks.onDownloadSample?.(s)
   )
   callbacks.onDownloadComplete?.()
 

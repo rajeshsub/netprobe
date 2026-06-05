@@ -151,7 +151,12 @@
   }
 
   @keyframes shimmer {
-    0%, 100% { opacity: 0.3 }
-    50% { opacity: 0.7 }
+    0%,
+    100% {
+      opacity: 0.3;
+    }
+    50% {
+      opacity: 0.7;
+    }
   }
 </style>

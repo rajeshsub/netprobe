@@ -4,11 +4,12 @@
 // by other health checks (ISP info, CDN latency, etc.) that ran before this.
 
 function nonZeroDnsTimes(): number[] {
-  if (typeof performance === 'undefined' || typeof performance.getEntriesByType !== 'function') return []
+  if (typeof performance === 'undefined' || typeof performance.getEntriesByType !== 'function')
+    return []
   const entries = performance.getEntriesByType('resource') as PerformanceResourceTiming[]
   return entries
-    .filter(e => e.domainLookupStart > 0 && e.domainLookupEnd > e.domainLookupStart)
-    .map(e => e.domainLookupEnd - e.domainLookupStart)
+    .filter((e) => e.domainLookupStart > 0 && e.domainLookupEnd > e.domainLookupStart)
+    .map((e) => e.domainLookupEnd - e.domainLookupStart)
 }
 
 export async function measureDnsTime(): Promise<number | null> {
@@ -24,7 +25,9 @@ export async function measureDnsTime(): Promise<number | null> {
     })
     const fresh = nonZeroDnsTimes()
     if (fresh.length > 0) return Math.min(...fresh)
-  } catch { /* fall through */ }
+  } catch {
+    /* fall through */
+  }
 
   return null
 }

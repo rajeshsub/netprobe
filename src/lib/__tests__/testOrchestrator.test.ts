@@ -1,19 +1,35 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
-const { mockMeasureBufferBloat, mockRunEarlyHealthChecks, mockRunLateHealthChecks, mockCombineHealthResults } = vi.hoisted(() => {
+const {
+  mockMeasureBufferBloat,
+  mockRunEarlyHealthChecks,
+  mockRunLateHealthChecks,
+  mockCombineHealthResults,
+} = vi.hoisted(() => {
   const healthResult = {
-    isp: 'Test ISP', asn: 'AS1234', city: 'Test City',
-    connectionType: 'wifi', effectiveConnectionType: '4g',
-    webrtcLeakDetected: false, webrtcIps: [],
-    packetLossPercent: 0, dnsTimeMs: 20,
+    isp: 'Test ISP',
+    asn: 'AS1234',
+    city: 'Test City',
+    connectionType: 'wifi',
+    effectiveConnectionType: '4g',
+    webrtcLeakDetected: false,
+    webrtcIps: [],
+    packetLossPercent: 0,
+    dnsTimeMs: 20,
     cdnLatencies: [{ name: 'Cloudflare', latencyMs: 12 }],
   }
   const earlyResult = {
     ispInfo: { isp: 'Test ISP', asn: 'AS1234', city: 'Test City', ip: '1.2.3.4' },
-    webrtcLeakDetected: false, webrtcIps: [],
-    connectionType: 'wifi', effectiveConnectionType: '4g',
+    webrtcLeakDetected: false,
+    webrtcIps: [],
+    connectionType: 'wifi',
+    effectiveConnectionType: '4g',
   }
-  const lateResult = { packetLossPercent: 0, cdnLatencies: [{ name: 'Cloudflare', latencyMs: 12 }], dnsTimeMs: 20 }
+  const lateResult = {
+    packetLossPercent: 0,
+    cdnLatencies: [{ name: 'Cloudflare', latencyMs: 12 }],
+    dnsTimeMs: 20,
+  }
   return {
     mockMeasureBufferBloat: vi.fn(),
     mockRunEarlyHealthChecks: vi.fn().mockResolvedValue(earlyResult),
@@ -29,11 +45,11 @@ vi.mock('../../config', () => ({
     clientVersion: '1.0.0',
     workerBase: '/',
     regions: [
-      { name: 'US East',   hostname: 'speedtest.newark.linode.com' },
-      { name: 'US West',   hostname: 'speedtest.fremont.linode.com' },
-      { name: 'EU West',   hostname: 'speedtest.london.linode.com' },
+      { name: 'US East', hostname: 'speedtest.newark.linode.com' },
+      { name: 'US West', hostname: 'speedtest.fremont.linode.com' },
+      { name: 'EU West', hostname: 'speedtest.london.linode.com' },
       { name: 'Asia East', hostname: 'speedtest.tokyo2.linode.com' },
-      { name: 'Oceania',   hostname: 'speedtest.sydney.linode.com' },
+      { name: 'Oceania', hostname: 'speedtest.sydney.linode.com' },
     ],
   },
 }))
@@ -57,11 +73,11 @@ vi.mock('../healthChecks/index', () => ({
 vi.mock('../regionSelector', () => ({
   buildPingUrl: (h: string) => `https://${h}/favicon.ico`,
   getGlobalRegions: () => [
-    { name: 'US East',   hostname: 'speedtest.newark.linode.com' },
-    { name: 'US West',   hostname: 'speedtest.fremont.linode.com' },
-    { name: 'EU West',   hostname: 'speedtest.london.linode.com' },
+    { name: 'US East', hostname: 'speedtest.newark.linode.com' },
+    { name: 'US West', hostname: 'speedtest.fremont.linode.com' },
+    { name: 'EU West', hostname: 'speedtest.london.linode.com' },
     { name: 'Asia East', hostname: 'speedtest.tokyo2.linode.com' },
-    { name: 'Oceania',   hostname: 'speedtest.sydney.linode.com' },
+    { name: 'Oceania', hostname: 'speedtest.sydney.linode.com' },
   ],
   selectServers: vi.fn(),
 }))
@@ -69,10 +85,19 @@ vi.mock('../regionSelector', () => ({
 import { runFullTest } from '../testOrchestrator'
 import type { ProviderFn, ProviderCallbacks } from '../speedProviders'
 
-const bloatResult = { baseline: 12, underLoad: 40, delta: 28, grade: 'B' as const, samples: [12, 40, 38] }
+const bloatResult = {
+  baseline: 12,
+  underLoad: 40,
+  delta: 28,
+  grade: 'B' as const,
+  samples: [12, 40, 38],
+}
 
 const nearestResult = {
-  downloadMbps: 450, uploadMbps: 120, latencyMs: 12, jitterMs: 3,
+  downloadMbps: 450,
+  uploadMbps: 120,
+  latencyMs: 12,
+  jitterMs: 3,
   serverHostname: 'speedtest.newark.linode.com',
 }
 
@@ -177,7 +202,9 @@ describe('runFullTest', () => {
   })
 
   it('falls back to second provider when first fails', async () => {
-    const failingProvider = makeNearestProvider(async () => { throw new Error('rate limited') })
+    const failingProvider = makeNearestProvider(async () => {
+      throw new Error('rate limited')
+    })
     const successProvider = makeNearestProvider(async (cb) => {
       cb.onServerChosen?.('fallback-host')
       cb.onDownloadComplete?.()
@@ -190,7 +217,9 @@ describe('runFullTest', () => {
   })
 
   it('throws when all providers fail', async () => {
-    const fail = makeNearestProvider(async () => { throw new Error('all down') })
+    const fail = makeNearestProvider(async () => {
+      throw new Error('all down')
+    })
     await expect(runFullTest(makeCallbacks(), [fail])).rejects.toThrow()
   })
 
@@ -205,8 +234,10 @@ describe('runFullTest', () => {
     const callbacks = makeCallbacks()
     await runFullTest(callbacks, [nearestProvider])
 
-    const regions = callbacks.onRegionComplete.mock.calls.map((c: unknown[]) => c[0] as { error: string | null })
-    expect(regions.every(r => r.error === 'unavailable')).toBe(true)
+    const regions = callbacks.onRegionComplete.mock.calls.map(
+      (c: unknown[]) => c[0] as { error: string | null }
+    )
+    expect(regions.every((r) => r.error === 'unavailable')).toBe(true)
     expect(regions).toHaveLength(5)
   })
 
@@ -221,12 +252,17 @@ describe('runFullTest', () => {
     const callbacks = makeCallbacks()
     await runFullTest(callbacks, [nearestProvider])
 
-    type R = { error: string | null; latencyMs: number | null; downloadMbps: number | null; uploadMbps: number | null }
+    type R = {
+      error: string | null
+      latencyMs: number | null
+      downloadMbps: number | null
+      uploadMbps: number | null
+    }
     const regions = callbacks.onRegionComplete.mock.calls.map((c: unknown[]) => c[0] as R)
     expect(regions).toHaveLength(5)
-    expect(regions.every(r => r.error === null)).toBe(true)
-    expect(regions.every(r => r.latencyMs !== null)).toBe(true)
-    expect(regions.every(r => r.downloadMbps === null)).toBe(true)
-    expect(regions.every(r => r.uploadMbps === null)).toBe(true)
+    expect(regions.every((r) => r.error === null)).toBe(true)
+    expect(regions.every((r) => r.latencyMs !== null)).toBe(true)
+    expect(regions.every((r) => r.downloadMbps === null)).toBe(true)
+    expect(regions.every((r) => r.uploadMbps === null)).toBe(true)
   })
 })

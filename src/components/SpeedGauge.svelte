@@ -30,7 +30,9 @@
       peakFraction = f
       trailOpacity = 0.6
       if (trailTimer) clearTimeout(trailTimer)
-      trailTimer = setTimeout(() => { trailOpacity = 0 }, 1400)
+      trailTimer = setTimeout(() => {
+        trailOpacity = 0
+      }, 1400)
     }
   })
 </script>
@@ -46,10 +48,7 @@
   <div class="bar-wrap">
     <div class="bar-track">
       <div class="bar-fill" style="width: {fraction * 100}%"></div>
-      <div
-        class="bar-peak"
-        style="left: {peakFraction * 100}%; opacity: {trailOpacity}"
-      ></div>
+      <div class="bar-peak" style="left: {peakFraction * 100}%; opacity: {trailOpacity}"></div>
     </div>
   </div>
 </div>
@@ -63,14 +62,18 @@
     background: var(--surface);
     border: 1px solid var(--border-subtle);
     border-radius: 16px;
-    transition: border-color 0.25s, box-shadow 0.25s;
+    transition:
+      border-color 0.25s,
+      box-shadow 0.25s;
     container-type: inline-size;
     min-width: 0;
   }
 
   .gauge.active {
     border-color: var(--accent);
-    box-shadow: 0 0 0 1px var(--accent), 0 0 24px var(--accent-glow);
+    box-shadow:
+      0 0 0 1px var(--accent),
+      0 0 24px var(--accent-glow);
   }
 
   .label {
@@ -138,6 +141,8 @@
     background: var(--accent);
     border-radius: 1px;
     transform: translateX(-50%);
-    transition: opacity 700ms ease-out, left 150ms ease-out;
+    transition:
+      opacity 700ms ease-out,
+      left 150ms ease-out;
   }
 </style>

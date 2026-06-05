@@ -10,7 +10,7 @@
     loading?: boolean
   } = $props()
 
-  const resultMap = $derived(new Map(regions.map(r => [r.name, r])))
+  const resultMap = $derived(new Map(regions.map((r) => [r.name, r])))
 
   function fmt(n: number | null): string {
     if (n === null) return '—'
@@ -93,7 +93,9 @@
     white-space: nowrap;
   }
 
-  th:last-child { text-align: right; }
+  th:last-child {
+    text-align: right;
+  }
 
   td {
     padding: 0.6rem 0.5rem;
@@ -103,10 +105,16 @@
     white-space: nowrap;
   }
 
-  td:last-child { text-align: right; }
-  tr:last-child td { border-bottom: none; }
+  td:last-child {
+    text-align: right;
+  }
+  tr:last-child td {
+    border-bottom: none;
+  }
 
-  .region-name { font-weight: 500; }
+  .region-name {
+    font-weight: 500;
+  }
 
   .pending-name {
     color: var(--subtext);
@@ -121,7 +129,9 @@
     margin-left: 1px;
   }
 
-  tr.error td { color: var(--subtext); }
+  tr.error td {
+    color: var(--subtext);
+  }
 
   .error-msg {
     font-size: 0.8rem;
@@ -141,7 +151,9 @@
   }
 
   @keyframes spin {
-    to { transform: rotate(360deg); }
+    to {
+      transform: rotate(360deg);
+    }
   }
 
   .skeleton {
@@ -152,10 +164,17 @@
     animation: shimmer 1.4s ease-in-out infinite;
   }
 
-  .skeleton.short { width: 2.5rem; }
+  .skeleton.short {
+    width: 2.5rem;
+  }
 
   @keyframes shimmer {
-    0%, 100% { opacity: 0.3 }
-    50% { opacity: 0.7 }
+    0%,
+    100% {
+      opacity: 0.3;
+    }
+    50% {
+      opacity: 0.7;
+    }
   }
 </style>

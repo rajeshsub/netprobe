@@ -38,12 +38,20 @@
 
   function labelConnectionType(ct: string | null, ect: string | null): string | null {
     const ctLabels: Record<string, string> = {
-      wifi: 'Wi-Fi', cellular: 'Cellular', ethernet: 'Ethernet',
-      bluetooth: 'Bluetooth', wimax: 'WiMAX', other: 'Other',
-      none: 'None', unknown: 'Unknown',
+      wifi: 'Wi-Fi',
+      cellular: 'Cellular',
+      ethernet: 'Ethernet',
+      bluetooth: 'Bluetooth',
+      wimax: 'WiMAX',
+      other: 'Other',
+      none: 'None',
+      unknown: 'Unknown',
     }
     const ectLabels: Record<string, string> = {
-      '4g': '4G / LTE', '3g': '3G', '2g': '2G', 'slow-2g': 'Slow 2G',
+      '4g': '4G / LTE',
+      '3g': '3G',
+      '2g': '2G',
+      'slow-2g': 'Slow 2G',
     }
     if (ct) return ctLabels[ct] ?? ct
     if (ect) return ectLabels[ect] ?? ect
@@ -51,9 +59,7 @@
   }
 
   const ispValue = $derived(health?.isp ?? null)
-  const ispDetail = $derived(
-    [health?.asn, health?.city].filter(Boolean).join(' · ') || undefined
-  )
+  const ispDetail = $derived([health?.asn, health?.city].filter(Boolean).join(' · ') || undefined)
   const connTypeLabel = $derived(
     health ? labelConnectionType(health.connectionType, health.effectiveConnectionType) : null
   )
@@ -87,7 +93,13 @@
     <HealthCard
       title="VPN Leak"
       value={wrtcLeak === null ? null : wrtcLeak ? 'Leak Detected' : 'Protected'}
-      verdict={wrtcLeak === null ? (loading ? undefined : 'unavailable') : wrtcLeak ? 'poor' : 'good'}
+      verdict={wrtcLeak === null
+        ? loading
+          ? undefined
+          : 'unavailable'
+        : wrtcLeak
+          ? 'poor'
+          : 'good'}
       detail={wrtcLeak ? 'Real IP exposed via WebRTC' : undefined}
       {loading}
     />
@@ -127,7 +139,10 @@
               <span class="cdn-bar-wrap">
                 <span
                   class="cdn-bar"
-                  style="width: {Math.min((cdn.latencyMs / 300) * 100, 100)}%; background: {cdnColor(cdn.latencyMs)}"
+                  style="width: {Math.min(
+                    (cdn.latencyMs / 300) * 100,
+                    100
+                  )}%; background: {cdnColor(cdn.latencyMs)}"
                 ></span>
               </span>
               <span class="cdn-value" style="color: {cdnColor(cdn.latencyMs)}">
@@ -166,11 +181,15 @@
   }
 
   @media (max-width: 600px) {
-    .card-grid { grid-template-columns: repeat(2, 1fr); }
+    .card-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
   }
 
   @media (max-width: 380px) {
-    .card-grid { grid-template-columns: 1fr; }
+    .card-grid {
+      grid-template-columns: 1fr;
+    }
   }
 
   .cdn-panel {
@@ -250,7 +269,12 @@
   }
 
   @keyframes shimmer {
-    0%, 100% { opacity: 0.3 }
-    50% { opacity: 0.7 }
+    0%,
+    100% {
+      opacity: 0.3;
+    }
+    50% {
+      opacity: 0.7;
+    }
   }
 </style>

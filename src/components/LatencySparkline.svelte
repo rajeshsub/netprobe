@@ -39,10 +39,7 @@
             font: '10px system-ui',
           },
         ],
-        series: [
-          {},
-          { stroke: accent, width: 2, fill: `${accent}18` },
-        ],
+        series: [{}, { stroke: accent, width: 2, fill: `${accent}18` }],
         scales: { y: { min: 0 } },
       },
       makeData(samples),
@@ -52,7 +49,7 @@
   }
 
   onMount(() => {
-    resizeObserver = new ResizeObserver(entries => {
+    resizeObserver = new ResizeObserver((entries) => {
       const width = entries[0].contentRect.width
       if (width <= 0) return
       if (!chart) {
