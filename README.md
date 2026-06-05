@@ -32,7 +32,7 @@ Buffer bloat is graded A–F. An A means your latency barely changes during a do
 4. Runs the same download + upload test in parallel against 5 fixed global regions (US East, US West, EU West, Asia East, Oceania)
 5. Shows per-region results and an averaged headline
 
-Everything runs in the browser. No data is collected, stored or shared about anyone who runs the test.
+Everything runs in the browser. No data is collected, stored or shared by netprobe!
 
 ---
 
