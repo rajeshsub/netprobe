@@ -13,6 +13,8 @@
      * of JS in `.svelte` files.
      */
     "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
     "allowJs": true,
     "checkJs": true,
     "moduleDetection": "force"

@@ -18,7 +18,7 @@
   }
 </script>
 
-<div class="container">
+<div class="container" class:loading>
   <div class="section-label">By Region</div>
   <div class="table-wrap">
     <table>
@@ -59,7 +59,7 @@
   .container {
     background: var(--surface);
     border: 1px solid var(--border-subtle);
-    border-radius: 16px;
+    border-radius: 0;
     padding: 1.25rem;
   }
 
@@ -69,6 +69,20 @@
     letter-spacing: 0.09em;
     color: var(--subtext);
     margin-bottom: 0.875rem;
+  }
+
+  .container.loading .section-label {
+    animation: label-flash 1s ease-in-out infinite;
+  }
+
+  @keyframes label-flash {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.15;
+    }
   }
 
   .table-wrap {

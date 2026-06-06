@@ -55,5 +55,6 @@ export async function measurePacketLoss(regionHostnames: string[]): Promise<numb
 
   // Return the median loss rate across all tested endpoints.
   const sorted = [...values].sort((a, b) => a - b)
-  return sorted[Math.floor(sorted.length / 2)]
+  // Non-null: values.length > 0 checked above.
+  return sorted[Math.floor(sorted.length / 2)]!
 }

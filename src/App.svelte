@@ -9,10 +9,9 @@
   import RegionTable from './components/RegionTable.svelte'
   import ConnectionHealthPanel from './components/ConnectionHealthPanel.svelte'
   import TraceBorder from './components/TraceBorder.svelte'
-
+  import LatencyTimeline from './components/LatencyTimeline.svelte'
   let copied = $state(false)
   let isShared = $state(false)
-  let traceEpoch = $state(0)
 
   onMount(() => {
     const hash = window.location.hash
@@ -29,12 +28,13 @@
     fetch(`${workerBase}ndt7-download-worker.js`, { method: 'HEAD' })
       .then((r) => {
         if (!r.ok)
-          console.error(
-            `[netprobe] worker file not found: ${workerBase}ndt7-download-worker.js (${r.status})`
-          )
-        else console.log(`[netprobe] worker files OK at ${workerBase}`)
+          console.error('[netprobe] worker-file-not-found', {
+            path: `${workerBase}ndt7-download-worker.js`,
+            status: r.status,
+          })
+        else console.log('[netprobe] worker-files-ok', { base: workerBase })
       })
-      .catch((e) => console.error('[netprobe] worker file fetch failed:', e))
+      .catch((e) => console.error('[netprobe] worker-file-fetch-failed', { error: e }))
   })
 
   const TOTAL_REGIONS = 5
@@ -99,14 +99,13 @@
 
   async function startTest() {
     testState.reset()
+    testState.testStartMs = performance.now()
     testState.phase = 'locating'
-    traceEpoch = 0
     isShared = false
 
     try {
       const results = await runFullTest({
         onPhase: (p) => {
-          if (p === 'nearest_download' && traceEpoch === 0) traceEpoch = Date.now()
           testState.phase = p
         },
         onDownloadSample: (s) => {
@@ -193,55 +192,46 @@
       </div>
     {:else}
       {#if isRunning || isDone}
+        <!-- Horizontal phase stepper -->
         <div
-          class="progress-panel"
+          class="stepper-panel"
           class:panel-done={isDone && testProducedData}
           class:panel-warn={isDone && !testProducedData}
         >
-          <!-- Progress bar row -->
-          <div class="progress-header">
-            {#if isDone && testProducedData}
-              <span class="progress-label done-label">
-                <span class="done-tick" aria-hidden="true">✓</span>
-                All {STEPS.length} steps complete
-              </span>
-            {:else if isDone && !testProducedData}
-              <span class="progress-label warn-label">
-                <span class="warn-icon" aria-hidden="true">!</span>
-                No data returned. Check browser console (F12) for details.
-                {#if testState.error}<em>{testState.error}</em>{/if}
-              </span>
-            {:else}
-              <span class="progress-label">Step {completedStepCount} of {STEPS.length}</span>
-            {/if}
-            <div
-              class="progress-track"
-              role="progressbar"
-              aria-valuenow={progressPct}
-              aria-valuemin={0}
-              aria-valuemax={100}
-            >
-              <div class="progress-fill" style="width: {progressPct}%"></div>
-            </div>
-          </div>
+          {#if isDone && !testProducedData}
+            <p class="warn-msg">
+              No data returned — check browser console (F12).
+              {#if testState.error}<em>{testState.error}</em>{/if}
+            </p>
+          {/if}
 
-          <!-- Step checklist -->
-          <ol class="step-list">
-            {#each STEPS as step (step.id)}
+          <div class="stepper-row" role="list">
+            {#each STEPS as step, i (step.id)}
               {@const done = isStepDone(step.id)}
               {@const active = isStepActive(step.id)}
-              <li class="step" class:step-done={done} class:step-active={active}>
-                <span class="step-icon" aria-hidden="true">
+              <div class="stepper-node" class:done class:active role="listitem">
+                {#if i > 0}<div
+                    class="connector"
+                    class:done={isStepDone(STEPS[i - 1]!.id)}
+                  ></div>{/if}
+                <div class="node-circle">
                   {#if done}
-                    <span class="tick">✓</span>
+                    <svg width="10" height="8" viewBox="0 0 10 8" aria-hidden="true">
+                      <polyline
+                        points="1,4 4,7 9,1"
+                        fill="none"
+                        stroke="white"
+                        stroke-width="1.8"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      />
+                    </svg>
                   {:else if active}
-                    <span class="pulse-dot"></span>
-                  {:else}
-                    <span class="empty-dot"></span>
+                    <span class="pulse-inner" aria-hidden="true"></span>
                   {/if}
-                </span>
-                <span class="step-label">{step.label}</span>
-                <span class="step-hint">
+                </div>
+                <span class="node-label">{step.label}</span>
+                <span class="node-hint">
                   {#if step.id === 'server' && testState.nearestRegion}
                     {testState.nearestRegion.split('.')[0]}
                   {:else if step.id === 'download' && testState.downloadMbps > 0 && (done || active)}
@@ -251,19 +241,48 @@
                   {:else if step.id === 'upload' && testState.uploadMbps > 0 && (done || active)}
                     {testState.uploadMbps.toFixed(0)} Mbps
                   {:else if step.id === 'global' && testState.regions.length > 0}
-                    {testState.regions.length} / {TOTAL_REGIONS}
+                    {testState.regions.length}/{TOTAL_REGIONS}
                   {:else if step.id === 'health' && isDone}
                     7 checks
                   {/if}
                 </span>
-              </li>
+              </div>
             {/each}
-          </ol>
+          </div>
+
+          <!-- Progress bar -->
+          <div
+            class="progress-track"
+            role="progressbar"
+            aria-valuenow={progressPct}
+            aria-valuemin={0}
+            aria-valuemax={100}
+          >
+            <div class="progress-fill" style="width: {progressPct}%"></div>
+          </div>
         </div>
+
+        <!-- Per-phase latency charts — side by side when both are visible -->
+        {#if testState.downloadLatencyTimeline.length > 0 || testState.phase === 'nearest_download' || testState.uploadLatencyTimeline.length > 0 || testState.phase === 'nearest_upload'}
+          <div class="timelines-row">
+            {#if testState.downloadLatencyTimeline.length > 0 || testState.phase === 'nearest_download'}
+              <LatencyTimeline
+                samples={testState.downloadLatencyTimeline}
+                title="Download — latency under load"
+              />
+            {/if}
+            {#if testState.uploadLatencyTimeline.length > 0 || testState.phase === 'nearest_upload'}
+              <LatencyTimeline
+                samples={testState.uploadLatencyTimeline}
+                title="Upload — latency under load"
+              />
+            {/if}
+          </div>
+        {/if}
       {/if}
 
       <div class="metrics-grid">
-        <TraceBorder active={testState.phase === 'nearest_download'} syncEpoch={traceEpoch}>
+        <TraceBorder active={testState.phase === 'nearest_download'} done={isStepDone('download')}>
           <SpeedGauge
             value={testState.downloadMbps}
             max={500}
@@ -272,7 +291,7 @@
             active={testState.phase === 'nearest_download'}
           />
         </TraceBorder>
-        <TraceBorder active={testState.phase === 'nearest_upload'} syncEpoch={traceEpoch}>
+        <TraceBorder active={testState.phase === 'nearest_upload'} done={isStepDone('upload')}>
           <SpeedGauge
             value={testState.uploadMbps}
             max={250}
@@ -285,7 +304,7 @@
           active={testState.phase === 'nearest_download' ||
             testState.phase === 'nearest_upload' ||
             (testState.latencyMs === 0 && isRunning)}
-          syncEpoch={traceEpoch}
+          done={isStepDone('upload')}
         >
           <SpeedGauge
             value={testState.latencyMs}
@@ -301,7 +320,7 @@
           active={testState.phase === 'nearest_download' ||
             testState.phase === 'nearest_upload' ||
             (testState.jitterMs === 0 && isRunning)}
-          syncEpoch={traceEpoch}
+          done={isStepDone('upload')}
         >
           <SpeedGauge
             value={testState.jitterMs}
@@ -315,7 +334,7 @@
         </TraceBorder>
         <TraceBorder
           active={testState.phase === 'nearest_download' || testState.phase === 'nearest_upload'}
-          syncEpoch={traceEpoch}
+          done={isStepDone('buffer_bloat')}
         >
           <BufferBloatPanel
             grade={testState.bufferBloatGrade}
@@ -330,13 +349,13 @@
       </div>
 
       {#if testState.phase === 'global' || testState.phase === 'health' || testState.phase === 'done' || testState.regions.length > 0}
-        <TraceBorder active={testState.phase === 'global'} syncEpoch={traceEpoch}>
+        <TraceBorder active={testState.phase === 'global'} done={isStepDone('global')}>
           <RegionTable regions={testState.regions} loading={testState.phase === 'global'} />
         </TraceBorder>
       {/if}
 
       {#if testState.phase === 'health' || testState.phase === 'done' || testState.healthChecks !== null}
-        <TraceBorder active={testState.phase === 'health'} syncEpoch={traceEpoch}>
+        <TraceBorder active={testState.phase === 'health'} done={isStepDone('health')}>
           <ConnectionHealthPanel
             health={testState.healthChecks}
             loading={testState.phase === 'health'}
@@ -423,7 +442,7 @@
   .shared-banner {
     background: var(--surface);
     border: 1px solid var(--border-subtle);
-    border-radius: 10px;
+    border-radius: 0;
     padding: 0.6rem 1rem;
     font-size: 0.83rem;
     color: var(--subtext);
@@ -456,69 +475,145 @@
     line-height: 1.65;
   }
 
-  /* ── Progress panel ─────────────────────────────────────── */
+  /* ── Horizontal phase stepper ───────────────────────────── */
 
-  .progress-panel {
+  .stepper-panel {
     background: var(--surface);
     border: 1px solid var(--border-subtle);
-    border-radius: 12px;
-    padding: 0.875rem 1rem;
+    border-radius: 0;
+    padding: 0.875rem 1rem 0.625rem;
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
     transition: border-color 0.3s;
   }
 
-  .progress-panel.panel-done {
+  .stepper-panel.panel-done {
     border-color: var(--grade-a);
   }
 
-  .progress-panel.panel-warn {
+  .stepper-panel.panel-warn {
     border-color: var(--grade-c);
   }
 
-  .progress-header {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-  }
-
-  .progress-label {
+  .warn-msg {
     font-size: 0.78rem;
-    color: var(--subtext);
-    white-space: nowrap;
-    letter-spacing: 0.01em;
-    flex-shrink: 0;
-    min-width: 7.5rem;
-  }
-
-  .done-label {
-    color: var(--grade-a);
-    display: flex;
-    align-items: center;
-    gap: 0.35rem;
-  }
-
-  .warn-label {
     color: var(--grade-c);
+  }
+
+  .stepper-row {
+    display: flex;
+    align-items: flex-start;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .stepper-row::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Each step node occupies equal horizontal space */
+  .stepper-node {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex: 1;
+    min-width: 56px;
+    position: relative;
+    gap: 0.3rem;
+  }
+
+  /* Connector line: spans from center of previous node to center of this node */
+  .stepper-node:not(:first-child) .connector {
+    position: absolute;
+    top: 8px; /* half of 18px circle */
+    left: calc(-50% + 1px);
+    width: 100%;
+    height: 2px;
+    background: var(--border-subtle);
+    z-index: 0;
+    transition: background 0.3s;
+  }
+
+  .stepper-node:not(:first-child) .connector.done {
+    background: var(--grade-a);
+  }
+
+  /* Step circle */
+  .node-circle {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    border: 2px solid var(--border-subtle);
+    background: var(--surface);
     display: flex;
     align-items: center;
-    gap: 0.35rem;
+    justify-content: center;
+    position: relative;
+    z-index: 1;
+    flex-shrink: 0;
+    transition:
+      border-color 0.25s,
+      background 0.25s;
   }
 
-  .done-tick {
-    font-weight: 700;
-    font-size: 0.85rem;
+  .stepper-node.done .node-circle {
+    border-color: var(--grade-a);
+    background: var(--grade-a);
   }
 
-  .warn-icon {
-    font-weight: 800;
-    font-size: 0.85rem;
+  .stepper-node.active .node-circle {
+    border-color: var(--accent);
   }
 
+  /* Pulsing dot for active step */
+  .pulse-inner {
+    display: block;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--accent);
+    animation: node-pulse 1.2s ease-in-out infinite;
+  }
+
+  @keyframes node-pulse {
+    0%,
+    100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 0.3;
+      transform: scale(0.55);
+    }
+  }
+
+  .node-label {
+    font-size: 0.66rem;
+    color: var(--subtext);
+    text-align: center;
+    white-space: nowrap;
+    transition: color 0.2s;
+    letter-spacing: 0.01em;
+  }
+
+  .stepper-node.done .node-label,
+  .stepper-node.active .node-label {
+    color: var(--text);
+  }
+
+  .node-hint {
+    font-size: 0.6rem;
+    color: var(--accent);
+    text-align: center;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+    min-height: 0.75rem;
+  }
+
+  /* Progress bar */
   .progress-track {
-    flex: 1;
-    height: 4px;
+    height: 3px;
     background: var(--border-subtle);
     border-radius: 99px;
     overflow: hidden;
@@ -532,101 +627,12 @@
     box-shadow: 0 0 6px var(--accent-glow);
   }
 
-  /* ── Step list ─────────────────────────────────────────── */
+  /* ── Latency timeline row ────────────────────────────────── */
 
-  .step-list {
-    list-style: none;
-    display: flex;
-    flex-direction: column;
-    gap: 0;
-  }
-
-  .step {
-    display: flex;
-    align-items: center;
-    gap: 0.55rem;
-    padding: 0.3rem 0;
-    font-size: 0.8rem;
-    color: var(--subtext);
-    border-top: 1px solid transparent;
-    transition: color 0.2s;
-  }
-
-  .step:first-child {
-    border-top: 1px solid var(--border-subtle);
-  }
-
-  .step + .step {
-    border-top: 1px solid var(--border-subtle);
-  }
-
-  .step.step-done {
-    color: var(--text);
-  }
-
-  .step.step-active {
-    color: var(--text);
-  }
-
-  .step-icon {
-    width: 1rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-  }
-
-  .tick {
-    font-size: 0.78rem;
-    font-weight: 700;
-    color: var(--grade-a);
-    line-height: 1;
-  }
-
-  .pulse-dot {
-    display: block;
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: var(--accent);
-    box-shadow: 0 0 6px var(--accent);
-    animation: pulse 1.2s ease-in-out infinite;
-  }
-
-  .empty-dot {
-    display: block;
-    width: 5px;
-    height: 5px;
-    border-radius: 50%;
-    border: 1px solid var(--border-subtle);
-    background: transparent;
-  }
-
-  @keyframes pulse {
-    0%,
-    100% {
-      opacity: 1;
-      transform: scale(1);
-    }
-    50% {
-      opacity: 0.3;
-      transform: scale(0.7);
-    }
-  }
-
-  .step-label {
-    flex: 1;
-  }
-
-  .step-hint {
-    font-size: 0.72rem;
-    color: var(--subtext);
-    font-variant-numeric: tabular-nums;
-    letter-spacing: 0.01em;
-  }
-
-  .step.step-done .step-hint {
-    color: var(--accent);
+  .timelines-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 0.875rem;
   }
 
   /* ── Metrics grid ────────────────────────────────────────── */
@@ -656,7 +662,7 @@
     font-size: 1rem;
     font-weight: 700;
     padding: 0.875rem 2.75rem;
-    border-radius: 10px;
+    border-radius: 0;
     letter-spacing: 0.01em;
     transition:
       opacity 0.15s,
@@ -681,7 +687,7 @@
     font-size: 0.875rem;
     font-weight: 500;
     padding: 0.625rem 1.5rem;
-    border-radius: 10px;
+    border-radius: 0;
     transition: border-color 0.15s;
   }
 
@@ -698,7 +704,7 @@
   .error-box {
     background: var(--surface);
     border: 1px solid rgba(239, 68, 68, 0.25);
-    border-radius: 12px;
+    border-radius: 0;
     padding: 1.5rem;
     display: flex;
     flex-direction: column;

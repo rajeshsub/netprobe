@@ -15,13 +15,13 @@ export interface NDT7Result {
 }
 
 export interface NDT7Callbacks {
-  onServerChosen?: (hostname: string) => void
-  onDownloadStart?: () => void
-  onDownloadSample?: (sample: SpeedSample) => void
-  onLatencySample?: (ms: number) => void
-  onDownloadComplete?: () => void
-  onUploadSample?: (sample: SpeedSample) => void
-  onError?: (msg: string) => void
+  onServerChosen?: ((hostname: string) => void) | undefined
+  onDownloadStart?: (() => void) | undefined
+  onDownloadSample?: ((sample: SpeedSample) => void) | undefined
+  onLatencySample?: ((ms: number) => void) | undefined
+  onDownloadComplete?: (() => void) | undefined
+  onUploadSample?: ((sample: SpeedSample) => void) | undefined
+  onError?: ((msg: string) => void) | undefined
 }
 
 function extractHostname(urls: Record<string, string>): string {

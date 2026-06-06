@@ -11,6 +11,9 @@ export const config = {
   clientName: env.VITE_CLIENT_NAME as string,
   clientVersion: env.VITE_CLIENT_VERSION as string,
   workerBase: env.BASE_URL as string,
+  // External CDN endpoint for buffer bloat RTT probes — must be unrelated to the
+  // speed-test server so measurements capture ISP last-mile queue delay.
+  pingUrl: 'https://www.cloudflare.com/cdn-cgi/trace',
   regions: [
     { name: 'US East', hostname: env.VITE_REGION_US_EAST as string },
     { name: 'US West', hostname: env.VITE_REGION_US_WEST as string },

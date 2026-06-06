@@ -6,6 +6,7 @@ vi.mock('../../config', () => ({
     clientName: 'netprobe',
     clientVersion: '1.0.0',
     workerBase: '/',
+    pingUrl: 'https://www.cloudflare.com/cdn-cgi/trace',
     regions: [
       { name: 'US East', hostname: 'mlab1-lga05.mlab-oti.measurement-lab.org' },
       { name: 'US West', hostname: 'mlab1-lax05.mlab-oti.measurement-lab.org' },
@@ -16,7 +17,7 @@ vi.mock('../../config', () => ({
   },
 }))
 
-import { runWithFallback, PROVIDER_NAMES } from '../speedProviders'
+import { runWithFallback, PROVIDER_NAMES, DEFAULT_PROVIDERS } from '../speedProviders'
 import type { ProviderFn, ProviderCallbacks, ProviderResult } from '../speedProviders'
 
 const okResult: ProviderResult = {
@@ -113,5 +114,53 @@ describe('runWithFallback', () => {
     await runWithFallback([p1, p2], { onDownloadSample: onDownload })
     // Both providers fire onDownloadSample — runner doesn't suppress them
     expect(onDownload).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not call onProviderSwitch on the first attempt', async () => {
+    const onSwitch = vi.fn()
+    const p1 = vi
+      .fn<(cb: ProviderCallbacks) => Promise<ProviderResult>>()
+      .mockResolvedValue(okResult)
+    await runWithFallback([p1], {}, onSwitch)
+    expect(onSwitch).not.toHaveBeenCalled()
+  })
+
+  it('throws when provider list is empty', async () => {
+    await expect(runWithFallback([], {})).rejects.toThrow('All speed test providers failed')
+  })
+
+  it('forwards onLatencySample callback', async () => {
+    const onLatencySample = vi.fn()
+    const p1 = makeProvider(async (cb) => {
+      cb.onLatencySample?.(42)
+      return okResult
+    })
+    await runWithFallback([p1], { onLatencySample })
+    expect(onLatencySample).toHaveBeenCalledWith(42)
+  })
+})
+
+describe('DEFAULT_PROVIDERS', () => {
+  it('has at least 2 providers', () => {
+    expect(DEFAULT_PROVIDERS.length).toBeGreaterThanOrEqual(2)
+  })
+
+  it('every provider is a function', () => {
+    for (const p of DEFAULT_PROVIDERS) {
+      expect(typeof p).toBe('function')
+    }
+  })
+})
+
+describe('PROVIDER_NAMES', () => {
+  it('has same length as DEFAULT_PROVIDERS', () => {
+    expect(PROVIDER_NAMES.length).toBe(DEFAULT_PROVIDERS.length)
+  })
+
+  it('all names are non-empty strings', () => {
+    for (const name of PROVIDER_NAMES) {
+      expect(typeof name).toBe('string')
+      expect(name.length).toBeGreaterThan(0)
+    }
   })
 })

@@ -4,6 +4,9 @@ import { svelte } from '@sveltejs/vite-plugin-svelte'
 export default defineConfig({
   plugins: [svelte()],
   base: process.env.VITE_BASE_URL || '/',
+  resolve: {
+    conditions: ['browser'],
+  },
   test: {
     environment: 'jsdom',
     globals: true,
@@ -12,10 +15,10 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       thresholds: {
-        lines: 25,
-        branches: 25,
-        functions: 25,
-        statements: 25,
+        lines: 58,
+        branches: 60,
+        functions: 45,
+        statements: 58,
       },
     },
   },

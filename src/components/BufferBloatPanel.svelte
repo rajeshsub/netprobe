@@ -126,7 +126,7 @@
   .panel {
     background: var(--surface);
     border: 1px solid var(--border-subtle);
-    border-radius: 16px;
+    border-radius: 0;
     padding: 0.875rem 0.875rem 0.75rem;
     transition:
       border-color 0.25s,
@@ -136,11 +136,18 @@
     flex-direction: column;
   }
 
-  .panel.active {
-    border-color: var(--accent);
-    box-shadow:
-      0 0 0 1px var(--accent),
-      0 0 24px var(--accent-glow);
+  .panel.active .section-label {
+    animation: label-flash 1s ease-in-out infinite;
+  }
+
+  @keyframes label-flash {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.15;
+    }
   }
 
   .top {

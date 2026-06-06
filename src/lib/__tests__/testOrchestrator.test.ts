@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 const {
   mockMeasureBufferBloat,
+  mockMeasureBaselineRTT,
   mockRunEarlyHealthChecks,
   mockRunLateHealthChecks,
   mockCombineHealthResults,
@@ -32,6 +33,7 @@ const {
   }
   return {
     mockMeasureBufferBloat: vi.fn(),
+    mockMeasureBaselineRTT: vi.fn().mockResolvedValue([10, 12, 11, 10, 12, 11]),
     mockRunEarlyHealthChecks: vi.fn().mockResolvedValue(earlyResult),
     mockRunLateHealthChecks: vi.fn().mockResolvedValue(lateResult),
     mockCombineHealthResults: vi.fn().mockReturnValue(healthResult),
@@ -61,6 +63,7 @@ vi.mock('../ndt7Engine', () => ({
 }))
 vi.mock('../bufferBloatDetector', () => ({
   measureBufferBloat: mockMeasureBufferBloat,
+  measureBaselineRTT: mockMeasureBaselineRTT,
   computeBufferBloat: vi.fn(),
   gradeFromDelta: vi.fn(),
 }))
@@ -79,6 +82,7 @@ vi.mock('../regionSelector', () => ({
     { name: 'Asia East', hostname: 'speedtest.tokyo2.linode.com' },
     { name: 'Oceania', hostname: 'speedtest.sydney.linode.com' },
   ],
+  REGION_FALLBACKS: {},
   selectServers: vi.fn(),
 }))
 

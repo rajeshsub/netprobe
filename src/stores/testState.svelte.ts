@@ -2,6 +2,11 @@ import type { Phase } from '../lib/testOrchestrator'
 import type { RegionResult, TestResults, HealthCheckResults } from '../lib/urlSerializer'
 import type { BufferBloatGrade } from '../lib/bufferBloatDetector'
 
+export interface TimedSample {
+  t: number // seconds elapsed since phase start
+  ms: number
+}
+
 class TestState {
   phase = $state<Phase>('idle')
   downloadMbps = $state(0)
@@ -13,6 +18,10 @@ class TestState {
   bufferBloatUploadGrade = $state<BufferBloatGrade | null>(null)
   bufferBloatUploadDelta = $state<number | null>(null)
   bufferBloatSamples = $state<number[]>([])
+  downloadLatencyTimeline = $state<TimedSample[]>([])
+  uploadLatencyTimeline = $state<TimedSample[]>([])
+  testStartMs = $state(0)
+  uploadPhaseStartMs = $state(0)
   regions = $state<RegionResult[]>([])
   nearestRegion = $state('')
   healthChecks = $state<HealthCheckResults | null>(null)
@@ -30,6 +39,10 @@ class TestState {
     this.bufferBloatUploadGrade = null
     this.bufferBloatUploadDelta = null
     this.bufferBloatSamples = []
+    this.downloadLatencyTimeline = []
+    this.uploadLatencyTimeline = []
+    this.testStartMs = 0
+    this.uploadPhaseStartMs = 0
     this.regions = []
     this.nearestRegion = ''
     this.healthChecks = null
@@ -39,6 +52,15 @@ class TestState {
 
   addLatencySample(ms: number) {
     this.bufferBloatSamples = [...this.bufferBloatSamples, ms]
+    if (this.testStartMs === 0) return
+    if (this.phase === 'nearest_upload') {
+      if (this.uploadPhaseStartMs === 0) this.uploadPhaseStartMs = performance.now()
+      const t = (performance.now() - this.uploadPhaseStartMs) / 1000
+      this.uploadLatencyTimeline = [...this.uploadLatencyTimeline, { t, ms }]
+    } else {
+      const t = (performance.now() - this.testStartMs) / 1000
+      this.downloadLatencyTimeline = [...this.downloadLatencyTimeline, { t, ms }]
+    }
   }
 
   addRegion(r: RegionResult) {
