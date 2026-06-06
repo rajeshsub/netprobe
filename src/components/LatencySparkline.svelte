@@ -50,7 +50,7 @@
 
   onMount(() => {
     resizeObserver = new ResizeObserver((entries) => {
-      const width = entries[0].contentRect.width
+      const width = entries[0]?.contentRect.width ?? 0
       if (width <= 0) return
       if (!chart) {
         initChart(width)
@@ -80,7 +80,7 @@
   .sparkline {
     width: 100%;
     overflow: hidden;
-    border-radius: 8px;
+    border-radius: 0;
     min-height: 110px;
   }
 

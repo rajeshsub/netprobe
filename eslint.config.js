@@ -4,6 +4,7 @@ import tsParser from '@typescript-eslint/parser'
 import svelte from 'eslint-plugin-svelte'
 import svelteParser from 'svelte-eslint-parser'
 import globals from 'globals'
+import vitest from '@vitest/eslint-plugin'
 
 const svelte5Runes = {
   $state: 'readonly',
@@ -44,8 +45,11 @@ export default [
       ...ts.configs.recommended.rules,
       'no-unused-vars': 'off',
       '@typescript-eslint/no-unused-vars': unusedVarsRule,
-      '@typescript-eslint/no-explicit-any': 'warn',
-      '@typescript-eslint/consistent-type-imports': ['warn', { prefer: 'type-imports' }],
+      '@typescript-eslint/no-explicit-any': 'error',
+      '@typescript-eslint/consistent-type-imports': ['error', { prefer: 'type-imports' }],
+      '@typescript-eslint/no-floating-promises': 'error',
+      '@typescript-eslint/no-misused-promises': ['error', { checksVoidReturn: false }],
+      '@typescript-eslint/await-thenable': 'error',
     },
   },
   {
@@ -62,7 +66,7 @@ export default [
       ...ts.configs.recommended.rules,
       'no-unused-vars': 'off',
       '@typescript-eslint/no-unused-vars': unusedVarsRule,
-      '@typescript-eslint/no-explicit-any': 'warn',
+      '@typescript-eslint/no-explicit-any': 'error',
     },
   },
   {
@@ -81,7 +85,7 @@ export default [
     rules: {
       ...svelte.configs.recommended.rules,
       'no-unused-vars': unusedVarsRule,
-      '@typescript-eslint/no-explicit-any': 'warn',
+      '@typescript-eslint/no-explicit-any': 'error',
     },
   },
   {
@@ -94,8 +98,21 @@ export default [
     },
   },
   {
+    files: ['src/lib/__tests__/**/*.ts', '**/*.test.ts', '**/*.spec.ts'],
+    plugins: { vitest },
+    rules: {
+      ...vitest.configs.recommended.rules,
+      'vitest/no-focused-tests': 'error',
+      'vitest/no-disabled-tests': 'warn',
+      'vitest/consistent-test-it': ['error', { fn: 'it' }],
+      'vitest/expect-expect': 'error',
+      'vitest/no-standalone-expect': 'error',
+    },
+  },
+  {
     ignores: [
       'dist/**',
+      'coverage/**',
       'node_modules/**',
       '.svelte-kit/**',
       'public/**',

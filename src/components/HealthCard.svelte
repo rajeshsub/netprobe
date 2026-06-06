@@ -11,9 +11,9 @@
   }: {
     title: string
     value?: string | null
-    unit?: string
-    verdict?: Verdict
-    detail?: string
+    unit?: string | undefined
+    verdict?: Verdict | undefined
+    detail?: string | undefined
     loading?: boolean
   } = $props()
 
@@ -51,11 +51,11 @@
   .card {
     background: var(--surface);
     border: 1px solid var(--border-subtle);
-    border-radius: 14px;
-    padding: 1rem;
+    border-radius: 0;
+    padding: 0.65rem 0.75rem;
     display: flex;
     flex-direction: column;
-    gap: 0.25rem;
+    gap: 0.2rem;
     min-width: 0;
     transition: border-color 0.2s;
   }
@@ -73,7 +73,7 @@
   }
 
   .card-value {
-    font-size: 1.35rem;
+    font-size: 1.05rem;
     font-weight: 700;
     color: var(--text);
     font-variant-numeric: tabular-nums;
@@ -108,7 +108,7 @@
   }
 
   .verdict {
-    margin-top: 0.5rem;
+    margin-top: 0.3rem;
     font-size: 0.65rem;
     font-weight: 600;
     letter-spacing: 0.06em;

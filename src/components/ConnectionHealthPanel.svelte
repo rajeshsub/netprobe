@@ -69,7 +69,7 @@
   const cdnList = $derived(health?.cdnLatencies ?? null)
 </script>
 
-<div class="container">
+<div class="container" class:loading>
   <div class="section-label">Connection Health</div>
 
   <div class="card-grid">
@@ -160,7 +160,7 @@
   .container {
     background: var(--surface);
     border: 1px solid var(--border-subtle);
-    border-radius: 16px;
+    border-radius: 0;
     padding: 1.25rem;
     display: flex;
     flex-direction: column;
@@ -174,21 +174,31 @@
     color: var(--subtext);
   }
 
-  .card-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 0.75rem;
+  .container.loading .section-label {
+    animation: label-flash 1s ease-in-out infinite;
   }
 
-  @media (max-width: 600px) {
-    .card-grid {
-      grid-template-columns: repeat(2, 1fr);
+  @keyframes label-flash {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.15;
     }
   }
 
-  @media (max-width: 380px) {
+  .card-grid {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
+    gap: 0.5rem;
+  }
+
+  @media (max-width: 480px) {
     .card-grid {
-      grid-template-columns: 1fr;
+      grid-auto-flow: row;
+      grid-template-columns: repeat(2, 1fr);
     }
   }
 

@@ -39,7 +39,7 @@ async function pickFastest(hostnames: string[]): Promise<string> {
     )
     .sort((a, b) => a.value.latency - b.value.latency)
   if (ok.length === 0) throw new Error('No servers reachable')
-  return ok[0].value.hostname
+  return ok[0]!.value.hostname
 }
 
 async function streamDownload(
@@ -99,8 +99,9 @@ async function multiPing(
   }
   if (latencies.length === 0) throw new Error('Unreachable')
   const sorted = [...latencies].sort((a, b) => a - b)
-  const latencyMs = sorted[Math.floor(sorted.length / 2)]
-  const jitterMs = sorted.length > 1 ? (sorted[sorted.length - 1] - sorted[0]) / 2 : 0
+  // Non-null: latencies.length > 0 guarantees these indices exist.
+  const latencyMs = sorted[Math.floor(sorted.length / 2)]!
+  const jitterMs = sorted.length > 1 ? (sorted.at(-1)! - sorted[0]!) / 2 : 0
   return { latencyMs, jitterMs }
 }
 
@@ -270,7 +271,8 @@ export async function runWithFallback(
       onProviderSwitch?.(name, i + 1)
     }
     try {
-      return await providers[i](callbacks)
+      // Non-null: i is bounded by providers.length.
+      return await providers[i]!(callbacks)
     } catch (e) {
       lastError = e instanceof Error ? e : new Error(String(e))
       console.warn(`[netprobe] ${name} failed:`, lastError.message)

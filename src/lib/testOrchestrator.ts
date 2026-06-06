@@ -1,46 +1,16 @@
-import { measureBufferBloat } from './bufferBloatDetector'
-import { buildPingUrl, getGlobalRegions } from './regionSelector'
+import { measureBufferBloat, measureBaselineRTT } from './bufferBloatDetector'
+import { getGlobalRegions, REGION_FALLBACKS } from './regionSelector'
 import { runWithFallback, DEFAULT_PROVIDERS } from './speedProviders'
 import {
   runEarlyHealthChecks,
   runLateHealthChecks,
   combineHealthResults,
 } from './healthChecks/index'
+import { config } from '../config'
 import type { BufferBloatResult } from './bufferBloatDetector'
 import type { RegionResult, TestResults, HealthCheckResults } from './urlSerializer'
 import type { SpeedSample } from './ndt7Engine'
 import type { ProviderFn } from './speedProviders'
-
-// Fallback servers per region from multiple cloud providers.
-// Tried in parallel with the primary — if Linode rate-limits or blocks, these
-// absorb the failure silently.
-const REGION_FALLBACKS: Record<string, string[]> = {
-  'US East': [
-    'speedtest-nyc1.digitalocean.com',
-    'nj-us-ping.vultr.com',
-    's3.us-east-1.amazonaws.com',
-  ],
-  'US West': [
-    'speedtest-sfo2.digitalocean.com',
-    'wa-us-ping.vultr.com',
-    's3.us-west-2.amazonaws.com',
-  ],
-  'EU West': [
-    'speedtest-lon1.digitalocean.com',
-    'lon-gb-ping.vultr.com',
-    's3.eu-west-1.amazonaws.com',
-  ],
-  'Asia East': [
-    'speedtest-sgp1.digitalocean.com',
-    'sgp-sg-ping.vultr.com',
-    's3.ap-northeast-1.amazonaws.com',
-  ],
-  Oceania: [
-    'speedtest-syd1.digitalocean.com',
-    'syd-au-ping.vultr.com',
-    's3.ap-southeast-2.amazonaws.com',
-  ],
-}
 
 async function pingHost(hostname: string): Promise<number> {
   const latencies: number[] = []
@@ -101,6 +71,11 @@ export async function runFullTest(
 
   const earlyHealthPromise = runEarlyHealthChecks()
 
+  // Baseline runs concurrently with server discovery (locate API ~1–3 s, baseline ~1 s),
+  // so it adds no wall-clock time on typical connections and is guaranteed to finish
+  // before onServerChosen awaits it.
+  const baselineSamplesPromise = measureBaselineRTT(config.pingUrl, 6)
+
   let bufferBloat: BufferBloatResult = {
     baseline: 0,
     underLoad: 0,
@@ -108,7 +83,6 @@ export async function runFullTest(
     grade: 'A',
     samples: [],
   }
-  let pingUrl = ''
   let downloadResolve: () => void = () => {}
   let uploadResolve: () => void = () => {}
   const downloadDone = new Promise<void>((resolve) => {
@@ -120,18 +94,23 @@ export async function runFullTest(
 
   const nearestResult = await runWithFallback(providers, {
     onServerChosen: (hostname) => {
-      pingUrl = buildPingUrl(hostname)
       callbacks.onNearestServer(hostname)
       callbacks.onPhase('nearest_download')
 
-      void measureBufferBloat(
-        pingUrl,
-        () => downloadDone,
-        (ms) => callbacks.onLatencySample(ms),
-        () => uploadDone
-      ).then((result) => {
-        bufferBloat = result
-        callbacks.onBufferBloatComplete?.(result)
+      // Defer the measurement until baseline is ready (usually already resolved by the
+      // time onServerChosen fires). Phase transition above is kept synchronous so the
+      // UI updates immediately regardless of how quickly the baseline resolves.
+      void baselineSamplesPromise.then((baselineSamples) => {
+        void measureBufferBloat(
+          config.pingUrl,
+          baselineSamples,
+          () => downloadDone,
+          (ms) => callbacks.onLatencySample(ms),
+          () => uploadDone
+        ).then((result) => {
+          bufferBloat = result
+          callbacks.onBufferBloatComplete?.(result)
+        })
       })
     },
     onDownloadSample: (s) => callbacks.onDownloadSample(s),

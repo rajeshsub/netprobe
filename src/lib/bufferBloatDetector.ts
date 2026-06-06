@@ -21,7 +21,8 @@ export function gradeFromDelta(delta: number): BufferBloatGrade {
 
 function percentile(arr: number[], p: number): number {
   const sorted = [...arr].sort((a, b) => a - b)
-  return sorted[Math.floor(sorted.length * p)] ?? sorted[sorted.length - 1]
+  // Both fallbacks are safe: arr is non-empty (callers guard with .length check).
+  return sorted[Math.floor(sorted.length * p)] ?? sorted.at(-1)!
 }
 
 export function computeBufferBloat(
@@ -37,37 +38,56 @@ export function computeBufferBloat(
   return { baseline, underLoad, delta, grade: gradeFromDelta(delta), samples: loadSamples }
 }
 
-function ping(url: string): Promise<number> {
+// Image-based RTT probe. Uses <img> loading so the browser sends a real HTTP
+// request cross-origin without CORS or CORP restrictions blocking the timing.
+// The server's response is text/plain (not an image) so onerror fires immediately
+// after the response is received — giving us accurate round-trip time.
+function ping(url: string, timeoutMs = 2000): Promise<number | null> {
   return new Promise((resolve) => {
-    const t = performance.now()
     const img = new Image()
-    const done = () => resolve(performance.now() - t)
-    img.onload = done
-    img.onerror = done
-    img.src = `${url}?t=${t}`
+    const t0 = performance.now()
+    let settled = false
+    const settle = (result: number | null) => {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
+      resolve(result)
+    }
+    const timer = setTimeout(() => settle(null), timeoutMs)
+    img.onload = () => settle(performance.now() - t0)
+    img.onerror = () => settle(performance.now() - t0)
+    img.src = `${url}?_=${t0}`
   })
 }
 
-// Measures buffer bloat during download, and optionally upload.
-// Samples are tracked separately per phase so each direction gets its own
-// grade — combining them inflates the grade because upload saturates the
-// outgoing path, spiking any outgoing ping by 200ms+ even on healthy connections.
+// Measures pre-load RTT baseline. One warm-up ping absorbs DNS + TLS setup so
+// subsequent samples reflect steady-state RTT on an idle link.
+export async function measureBaselineRTT(url: string, count: number): Promise<number[]> {
+  await ping(url, 2000) // warm-up: discards connection-setup overhead
+  const samples: number[] = []
+  for (let i = 0; i < count; i++) {
+    const ms = await ping(url, 2000)
+    if (ms !== null) samples.push(ms)
+    if (i < count - 1) await new Promise<void>((r) => setTimeout(r, 200))
+  }
+  return samples
+}
+
+// Measures buffer bloat during download and optionally upload.
+//
+// baselineSamples MUST be measured before any load starts — the original implementation
+// measured baseline concurrently with the download, so both samples reflected the same
+// loaded condition and the delta collapsed to ~0ms (false Grade A).
+//
+// pingUrl should be an external endpoint unrelated to the speed-test server. Pinging the
+// same server risks server-side packet scheduling masking ISP last-mile queue delay.
 export async function measureBufferBloat(
   pingUrl: string,
+  baselineSamples: number[],
   runDownload: () => Promise<void>,
   onSample: (ms: number) => void,
   runUpload?: () => Promise<void>
 ): Promise<BufferBloatResult> {
-  const baselineSamples: number[] = []
-  for (let i = 0; i < 5; i++) {
-    try {
-      baselineSamples.push(await ping(pingUrl))
-    } catch {
-      /* skip */
-    }
-    await new Promise<void>((r) => setTimeout(r, 100))
-  }
-
   const downloadSamples: number[] = []
   const uploadSamples: number[] = []
   let inUpload = false
@@ -75,15 +95,13 @@ export async function measureBufferBloat(
 
   const pingLoop = async () => {
     while (active) {
-      try {
-        const ms = await ping(pingUrl)
+      const ms = await ping(pingUrl)
+      if (ms !== null) {
         if (inUpload) uploadSamples.push(ms)
         else downloadSamples.push(ms)
         onSample(ms)
-      } catch {
-        /* skip */
       }
-      await new Promise<void>((r) => setTimeout(r, 200))
+      await new Promise<void>((r) => setTimeout(r, 150))
     }
   }
 
@@ -103,7 +121,6 @@ export async function measureBufferBloat(
   return {
     ...dl,
     samples: [...downloadSamples, ...uploadSamples],
-    uploadGrade: ul?.grade,
-    uploadDelta: ul?.delta,
+    ...(ul !== undefined ? { uploadGrade: ul.grade, uploadDelta: ul.delta } : {}),
   }
 }

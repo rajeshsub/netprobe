@@ -61,19 +61,12 @@
     padding: 0.875rem 0.875rem 0.75rem;
     background: var(--surface);
     border: 1px solid var(--border-subtle);
-    border-radius: 16px;
+    border-radius: 0;
     transition:
       border-color 0.25s,
       box-shadow 0.25s;
     container-type: inline-size;
     min-width: 0;
-  }
-
-  .gauge.active {
-    border-color: var(--accent);
-    box-shadow:
-      0 0 0 1px var(--accent),
-      0 0 24px var(--accent-glow);
   }
 
   .label {
@@ -82,6 +75,20 @@
     letter-spacing: 0.07em;
     text-transform: uppercase;
     color: var(--subtext);
+  }
+
+  .gauge.active .label {
+    animation: label-flash 1s ease-in-out infinite;
+  }
+
+  @keyframes label-flash {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.15;
+    }
   }
 
   .center {

@@ -114,14 +114,14 @@ export function decode(hash: string): TestResults | null {
     const regions: RegionResult[] = regionStr
       ? regionStr.split(',').map((part) => {
           const segs = part.split(':')
-          const name = decodeURIComponent(segs[0])
+          const name = decodeURIComponent(segs[0] ?? '')
           if (segs[1] === 'err')
             return { name, downloadMbps: null, uploadMbps: null, latencyMs: null, error: 'failed' }
           return {
             name,
-            downloadMbps: parseFloat(segs[1]) || null,
-            uploadMbps: parseFloat(segs[2]) || null,
-            latencyMs: parseFloat(segs[3]) || null,
+            downloadMbps: parseFloat(segs[1] ?? '') || null,
+            uploadMbps: parseFloat(segs[2] ?? '') || null,
+            latencyMs: parseFloat(segs[3] ?? '') || null,
             error: null,
           }
         })
@@ -134,7 +134,7 @@ export function decode(hash: string): TestResults | null {
       const cdnLatencies: CdnLatency[] = cdnStr
         ? cdnStr.split(',').map((seg) => {
             const [name, ms] = seg.split(':')
-            return { name: decodeURIComponent(name), latencyMs: parseFloat(ms) || 0 }
+            return { name: decodeURIComponent(name ?? ''), latencyMs: parseFloat(ms ?? '') || 0 }
           })
         : []
 
